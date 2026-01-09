@@ -1,0 +1,34 @@
+[
+  {
+    "id": "london-lunch",
+    "location": "London",
+    "timezone": "Europe/London",
+    "type": "work-rule",
+    "title": "런던 지사 점심시간 규정",
+    "content": "런던 지사의 점심시간은 매일 12:00부터 14:00까지입니다. 이 시간에는 회의나 통화를 지양해야 합니다."
+  },
+  {
+    "id": "london-work-hours",
+    "location": "London",
+    "timezone": "Europe/London",
+    "type": "work-rule",
+    "title": "런던 지사 근무 시간",
+    "content": "런던 지사의 공식 근무 시간은 오전 9시부터 오후 6시까지입니다."
+  },
+  {
+    "id": "newyork-lunch",
+    "location": "New York",
+    "timezone": "America/New_York",
+    "type": "work-rule",
+    "title": "뉴욕 지사 점심시간 규정",
+    "content": "뉴욕 지사의 점심시간은 12:30부터 13:30까지입니다."
+  },
+  {
+    "id": "seoul-lunch",
+    "location": "Seoul",
+    "timezone": "Asia/Seoul",
+    "type": "work-rule",
+    "title": "서울 지사 점심시간 규정",
+    "content": "서울 지사의 점심시간은 12:00부터 13:00까지입니다."
+  }
+]
