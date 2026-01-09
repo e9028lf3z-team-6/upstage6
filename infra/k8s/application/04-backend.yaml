@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: gunwon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: gangwon-asist-backend:lite
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8800
+          env:
+            - name: CHROMA_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: CHROMA_HOST
+            - name: CHROMA_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: CHROMA_PORT
+            - name: UPSTAGE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: UPSTAGE_API_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: gunwon
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 80
+      targetPort: 8800

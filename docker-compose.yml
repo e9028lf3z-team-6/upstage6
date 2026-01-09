@@ -1,0 +1,37 @@
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - gangwon-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gangwon-yourname-backend:lite
+    container_name: gangwon-yourname-backend
+    ports:
+      - "8800:8800"
+    env_file:
+      - .env
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      - chromadb
+    networks:
+      - gangwon-network
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+
+networks:
+  gangwon-network:
+    driver: bridge
