@@ -91,6 +91,15 @@ JSON 외 텍스트 출력 금지.
 - cliche: {cliche_issues}
 - spelling(surface): {spelling_issues}
 
+작성 지침:
+- 각 guideline에는 아래 4가지 키를 반드시 포함
+  1) reason: 왜 문제가 되는지
+  2) focus: 어떤 관점에서 고쳐야 하는지
+  3) approach: 구체적인 수정 방향(예: 완화, 명시, 재배치, 맥락 추가)
+  4) outcome: 고친 후 독자가 기대할 변화(혼란 감소, 신뢰도 상승 등)
+- 동일한 이유의 반복 금지
+- 이슈별로 1~2개 가이드만 작성
+
 출력 JSON 형식:
 {{
   "rewrite_type": "assist",
@@ -99,7 +108,9 @@ JSON 외 텍스트 출력 금지.
     {{
       "category": "hate | trauma | logic | tone | cliche | reader_context | spelling",
       "reason": "왜 이 부분이 문제이거나 정리가 필요한지",
-      "focus": "어떤 관점에서 보완하거나 정리해야 하는지"
+      "focus": "어떤 관점에서 보완하거나 정리해야 하는지",
+      "approach": "구체적인 수정 방향",
+      "outcome": "수정 후 기대되는 독자 반응"
     }}
   ],
   "note": "수정 시 유의해야 할 전체 방향성 요약"

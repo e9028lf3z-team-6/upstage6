@@ -3,6 +3,7 @@ from fastapi import APIRouter
 # domain routers
 from .documents import router as documents_router
 from .analysis import router as analysis_router
+from .eval import router as eval_router
 
 # agent APIs
 from app.api.router import router as tools_router
@@ -16,6 +17,7 @@ router = APIRouter()
 # --------------------
 router.include_router(documents_router)
 router.include_router(analysis_router)
+router.include_router(eval_router)
 
 # --------------------
 # Agent APIs
