@@ -18,6 +18,14 @@ from app.agents.tools.rewrrite_assist import RewriteAssistAgent
 from app.agents.metrics.final_metric import FinalMetricAgent
 from app.agents.tools.report_agent import ComprehensiveReportAgent
 
+# Evaluators
+from app.agents.evaluators.tone_evaluator import ToneQualityAgent
+from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
+from app.agents.evaluators.tension_evaluator import TensionQualityAgent
+from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
+from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
+from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
+
 
 # ---- singleton instances (서비스와 동일)
 split_agent = SplitAgent()
@@ -36,6 +44,14 @@ aggregator = IssueBasedAggregatorAgent()
 rewrite_agent = RewriteAssistAgent()
 final_metric_agent = FinalMetricAgent()
 report_agent = ComprehensiveReportAgent()
+
+# Evaluator instances
+tone_quality_agent = ToneQualityAgent()
+causality_quality_agent = CausalityQualityAgent()
+tension_quality_agent = TensionQualityAgent()
+trauma_quality_agent = TraumaQualityAgent()
+hatebias_quality_agent = HateBiasQualityAgent()
+cliche_quality_agent = GenreClicheQualityAgent()
 
 
 def run_full_pipeline(text: str, *, debug: bool = False):
@@ -141,6 +157,18 @@ def run_full_pipeline(text: str, *, debug: bool = False):
         report = {"error": str(e), "full_report_markdown": "리포트 생성 중 오류가 발생했습니다."}
 
 
+    # 8. Evaluation Scores (QA)
+    qa_scores = {}
+    try:
+        qa_scores["tone"] = tone_quality_agent.run(text, tone).get("score", 0)
+        qa_scores["causality"] = causality_quality_agent.run(text, causality).get("score", 0)
+        qa_scores["tension"] = tension_quality_agent.run(text, tension).get("score", 0)
+        qa_scores["trauma"] = trauma_quality_agent.run(text, trauma).get("score", 0)
+        qa_scores["hate_bias"] = hatebias_quality_agent.run(text, hate).get("score", 0)
+        qa_scores["cliche"] = cliche_quality_agent.run(text, cliche).get("score", 0)
+    except Exception as e:
+        print(f"QA Evaluation failed: {e}")
+
     result = {
         "split": split_result,
         "tone": tone,
@@ -152,6 +180,7 @@ def run_full_pipeline(text: str, *, debug: bool = False):
         "aggregate": aggregate.dict(),
         "final_metric": final_metric,
         "report": report,  # Added report
+        "qa_scores": qa_scores, # Added scores
     }
 
     if debug:
