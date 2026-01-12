@@ -6,7 +6,7 @@ import httpx
 from pypdf import PdfReader
 from docx import Document as DocxDocument
 
-from app.core.settings import get_settings
+from backend.app.core.settings import get_settings
 
 SUPPORTED_EXT = {".pdf", ".docx", ".txt", ".md"}
 
