@@ -1,7 +1,7 @@
 # app/agents/metrics/causality_metric.py
 
 from typing import Dict, List
-from app.agents.base import BaseAgent
+from backend.app.agents.base import BaseAgent
 
 
 class CausalityMetricAgent(BaseAgent):

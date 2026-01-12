@@ -1,4 +1,4 @@
-from app.llm.client import get_upstage_client
+from backend.app.llm.client import get_upstage_client
 
 CHAT_MODEL = "solar-pro2"
 

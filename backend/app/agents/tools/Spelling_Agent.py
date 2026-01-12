@@ -1,5 +1,5 @@
-from app.agents.base import BaseAgent
-from app.llm.chat import chat
+from backend.app.agents.base import BaseAgent
+from backend.app.llm.chat import chat
 
 
 class SpellingAgent(BaseAgent):
