@@ -1,9 +1,11 @@
 # app/graph/nodes/aggregate_node.py
 from app.agents import IssueBasedAggregatorAgent
 from app.graph.state import AgentState
+from app.observability.langsmith import traceable_timed
 
 aggregator_agent = IssueBasedAggregatorAgent()
 
+@traceable_timed(name="aggregate")
 def aggregate_node(state: AgentState) -> AgentState:
     def extract_issues(result: dict | None):
         if not result:
@@ -31,6 +33,5 @@ def aggregate_node(state: AgentState) -> AgentState:
     )
 
     return {
-        **state,
         "aggregated_result": aggregate_result.model_dump(),
     }

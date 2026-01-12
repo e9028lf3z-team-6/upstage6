@@ -16,6 +16,7 @@ def run_metric_dev(req: AgentRequest):
 
     result = run_full_pipeline(
         text=req.text,
+        expected=req.expected,
         debug=True,
     )
 
