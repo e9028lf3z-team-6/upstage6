@@ -1,88 +1,107 @@
-import os, uuid
-from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException
+import json
+import uuid
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from app.core.db import get_session, Document
-from app.services.document_parser import document_parser, SUPPORTED_EXT
-from app.webapi.schemas import DocumentOut, DocumentDetail
+from app.core.db import get_session, Document, Analysis
+from app.services.analysis_runner import run_analysis_for_text
+from app.webapi.schemas import AnalysisOut, AnalysisDetail
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/analysis", tags=["analysis"])
 
-@router.get("", response_model=list[DocumentOut])
-async def list_documents():
+
+@router.post("/run/{doc_id}", response_model=AnalysisOut)
+async def run_analysis(doc_id: str):
     async with get_session() as session:
-        res = await session.execute(select(Document).order_by(Document.created_at.desc()))
-        docs = res.scalars().all()
-        return [DocumentOut(
-            id=d.id, title=d.title, filename=d.filename, content_type=d.content_type, created_at=str(d.created_at)
-        ) for d in docs]
+        d = await session.get(Document, doc_id)
+        if not d:
+            raise HTTPException(404, "Document not found")
 
-@router.post("/upload", response_model=DocumentOut)
-async def upload_document(file: UploadFile = File(...)):
-    ext = Path(file.filename).suffix.lower()
-    if ext not in SUPPORTED_EXT:
-        raise HTTPException(400, f"Unsupported file type: {ext}. Use {sorted(SUPPORTED_EXT)}.")
-
-    doc_id = str(uuid.uuid4())
-    safe_name = f"{doc_id}{ext}"
-    stored_path = Path("./data/uploads") / safe_name
-    content = await file.read()
-    stored_path.write_bytes(content)
-
+    # -----------------------------
+    # Run analysis OUTSIDE session
+    # -----------------------------
     try:
-        text, meta = await document_parser.extract_text(str(stored_path), file.content_type)
-    except Exception as e:
-        raise HTTPException(400, f"Failed to parse document: {e}")
-
-    title = Path(file.filename).stem
-
-    async with get_session() as session:
-        d = Document(
-            id=doc_id,
-            title=title,
-            filename=file.filename,
-            content_type=file.content_type or "application/octet-stream",
-            stored_path=str(stored_path),
-            extracted_text=text,
+        result = await run_analysis_for_text(
+            text=d.extracted_text,
+            context=d.meta_json,   # ← DocumentParser 메타 / 업로드 컨텍스트
         )
-        session.add(d)
+        status = "done"
+        if result.get("decision") == "report" and "Mock" in json.dumps(result, ensure_ascii=False):
+            status = "fallback"
+
+    except Exception as e:
+        result = {
+            "error": str(e),
+            "note": "analysis execution failed",
+        }
+        status = "failed"
+
+    # -----------------------------
+    # Persist result
+    # -----------------------------
+    async with get_session() as session:
+        a = Analysis(
+            id=str(uuid.uuid4()),
+            document_id=doc_id,
+            status=status,
+            result_json=json.dumps(result, ensure_ascii=False),
+        )
+        session.add(a)
         await session.commit()
 
-    return DocumentOut(id=doc_id, title=title, filename=file.filename, content_type=d.content_type, created_at=str(d.created_at))
-
-@router.get("/{doc_id}", response_model=DocumentDetail)
-async def get_document(doc_id: str):
-    async with get_session() as session:
-        d = await session.get(Document, doc_id)
-        if not d:
-            raise HTTPException(404, "Document not found")
-        return DocumentDetail(
-            id=d.id, title=d.title, filename=d.filename, content_type=d.content_type, created_at=str(d.created_at),
-            extracted_text=d.extracted_text
+        return AnalysisOut(
+            id=a.id,
+            document_id=doc_id,
+            status=a.status,
+            created_at=str(a.created_at),
         )
 
 
-@router.delete("/{doc_id}")
-async def delete_document(doc_id: str):
-    """Delete a document and all related analyses (cascade).
-
-    Also removes the uploaded file from ./data/uploads if it exists.
-    """
+@router.get("/{analysis_id}", response_model=AnalysisDetail)
+async def get_analysis(analysis_id: str):
     async with get_session() as session:
-        d = await session.get(Document, doc_id)
-        if not d:
-            raise HTTPException(404, "Document not found")
+        a = await session.get(Analysis, analysis_id)
+        if not a:
+            raise HTTPException(404, "Analysis not found")
 
-        # best-effort file cleanup
-        try:
-            if d.stored_path and os.path.exists(d.stored_path):
-                os.remove(d.stored_path)
-        except Exception:
-            # don't block DB delete on filesystem issues
-            pass
+        return AnalysisDetail(
+            id=a.id,
+            document_id=a.document_id,
+            status=a.status,
+            created_at=str(a.created_at),
+            result=json.loads(a.result_json),
+        )
 
-        await session.delete(d)
+
+@router.get("/by-document/{doc_id}", response_model=list[AnalysisOut])
+async def list_analyses_for_doc(doc_id: str):
+    async with get_session() as session:
+        res = await session.execute(
+            select(Analysis)
+            .where(Analysis.document_id == doc_id)
+            .order_by(Analysis.created_at.desc())
+        )
+        items = res.scalars().all()
+
+        return [
+            AnalysisOut(
+                id=i.id,
+                document_id=i.document_id,
+                status=i.status,
+                created_at=str(i.created_at),
+            )
+            for i in items
+        ]
+
+
+@router.delete("/{analysis_id}")
+async def delete_analysis(analysis_id: str):
+    async with get_session() as session:
+        a = await session.get(Analysis, analysis_id)
+        if not a:
+            raise HTTPException(404, "Analysis not found")
+
+        await session.delete(a)
         await session.commit()
 
     return {"ok": True}
