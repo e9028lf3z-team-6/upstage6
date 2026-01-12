@@ -142,11 +142,11 @@ export default function App() {
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
           <div>
             <div style={{fontSize:18, fontWeight:700}}>CONTEXTOR</div>
-            <div className="muted" style={{fontSize:12}}>로컬 문서 분석 (PDF/DOCX 업로드)</div>
+            <div className="muted" style={{fontSize:12}}>PDF/DOCX/HWP 업로드</div>
           </div>
           <label className="btn" style={{display:'inline-flex', alignItems:'center', gap:8}}>
             <span>업로드</span>
-            <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.md" onChange={onUpload} style={{display:'none'}} />
+            <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.md,.hwp,.hwpx" onChange={onUpload} style={{display:'none'}} />
           </label>
         </div>
 

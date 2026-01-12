@@ -49,7 +49,7 @@ class ComprehensiveReportAgent(BaseAgent):
         당신은 냉철하지만 건설적인 조언을 주는 '수석 편집자(Chief Editor)'입니다.
         당신의 목표는 작가가 이 리포트를 보고 글을 실제로 수정할 수 있도록 돕는 것입니다.
         
-        반드시 JSON 형식으로 출력해야 합니다.
+        결과는 마크다운(Markdown) 형식으로만 작성하십시오.
         """
 
         prompt = f"""
@@ -75,14 +75,6 @@ class ComprehensiveReportAgent(BaseAgent):
 
         [작성 지침 및 구조]
         당신은 아래의 구조와 원칙에 따라 마크다운(Markdown) 형식의 리포트를 작성해야 합니다.
-
-        1. 분석 결과 정리 원칙
-        - 에이전트별 의인화: 각 분석 영역을 "XX 에이전트는 이렇게 답변했습니다"라는 형식을 사용하여 전문성을 부여하십시오.
-        - 핵심 위주 요약: 모든 데이터를 나열하지 말고, 작가가 즉각적으로 이해해야 할 '치명적인 결함'과 '장점' 위주로 압축하십시오.
-        - 통찰력 있는 연결: 예를 들어, "말투의 문제(Tone)가 결국 캐릭터의 개연성(Causality)을 해치고 있다"는 식으로 서로 다른 에이전트의 결과를 연결해 분석하십시오.
-        - 명확한 결론: 최종적으로 '승인(Accept)', '수정 권고(Minor Revision)', '재작성(Rewrite)' 중 하나를 명확히 판정하십시오.
-
-        2. 보고서 출력 구조 (Markdown 내용에 반드시 포함)
         
         # [1. 종합 진단 요약]
         - **최종 판정**: (예: 🚨 재작성 권고 / ⚠️ 부분 수정 필요 / ✅ 승인)
@@ -98,14 +90,13 @@ class ComprehensiveReportAgent(BaseAgent):
         # [3. 최종 메트릭 및 개선 우선순위]
         - **핵심 리스크**: 가장 먼저 해결해야 할 문제 1-2가지.
         - **수정 방향 제안**: 작가가 바로 실행할 수 있는 구체적인 가이드라인.
-
-        [출력 형식 (JSON)]
-        {{
-            "report_title": "종합 분석 리포트",
-            "summary": "한 줄 요약 내용",
-            "full_report_markdown": "위 [작성 지침 및 구조]에 따라 작성된 전체 마크다운 텍스트"
-        }}
         """
 
         response = chat(prompt, system=system)
-        return self._safe_json_load(response)
+        
+        # JSON 파싱 없이 마크다운 텍스트를 그대로 반환
+        return {
+            "report_title": "종합 분석 리포트",
+            "summary": "종합 리포트를 확인하세요.",  # 요약은 마크다운 안에 포함됨
+            "full_report_markdown": response
+        }
