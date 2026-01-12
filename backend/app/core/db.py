@@ -19,6 +19,7 @@ class Document(Base):
     content_type: Mapped[str] = mapped_column(String(120))
     stored_path: Mapped[str] = mapped_column(String(500))
     extracted_text: Mapped[str] = mapped_column(Text)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     analyses: Mapped[list["Analysis"]] = relationship(back_populates="document", cascade="all, delete-orphan")
@@ -29,10 +30,27 @@ class Analysis(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
     status: Mapped[str] = mapped_column(String(40), default="done")
+    decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    has_issues: Mapped[bool | None] = mapped_column(nullable=True)
+    issue_counts_json: Mapped[str] = mapped_column(Text, default="{}")
+    queue_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     result_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped["Document"] = relationship(back_populates="analyses")
+
+
+class EvalRun(Base):
+    __tablename__ = "eval_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    document_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    metrics_json: Mapped[str] = mapped_column(Text)
+    scores_json: Mapped[str] = mapped_column(Text)
+    delta_json: Mapped[str] = mapped_column(Text, default="{}")
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    agent_latency_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 async def init_db():
     global engine, SessionLocal

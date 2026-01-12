@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     upstage_base_url: str = "https://api.upstage.ai/v1"
     upstage_document_parse_endpoint: str = "/document-ai/document-parse"
 
+    redis_url: str = "redis://localhost:6379/0"
+
 _settings: Settings | None = None
 
 def get_settings() -> Settings:

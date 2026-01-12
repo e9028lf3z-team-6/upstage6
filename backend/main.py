@@ -1,11 +1,15 @@
 from contextlib import asynccontextmanager
+import logging
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 from dotenv import load_dotenv
 
 from app.webapi.routes import router as api_router
 from app.core.settings import get_settings
 from app.core.db import init_db
+from app.core.logging import setup_logging
 
 
 @asynccontextmanager
@@ -13,7 +17,9 @@ async def lifespan(app: FastAPI):
     # -------------------------
     # Startup
     # -------------------------
-    load_dotenv()
+    project_root_env = Path(__file__).resolve().parents[1] / ".env"
+    load_dotenv(dotenv_path=project_root_env)
+    setup_logging()
     await init_db()
     yield
     # -------------------------
@@ -53,6 +59,24 @@ def create_app() -> FastAPI:
     # Routers
     # -------------------------
     app.include_router(api_router, prefix="/api")
+
+    logger = logging.getLogger("app.request")
+
+    @app.middleware("http")
+    async def log_requests(request, call_next):
+        started_at = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.info(
+            "request",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+        return response
 
     # -------------------------
     # Health check
