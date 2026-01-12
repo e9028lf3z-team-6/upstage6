@@ -1,107 +1,85 @@
-import json
+import os
 import uuid
-from fastapi import APIRouter, HTTPException
+import json
+from pathlib import Path
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
 
-from app.core.db import get_session, Document, Analysis
-from app.services.analysis_runner import run_analysis_for_text
-from app.webapi.schemas import AnalysisOut, AnalysisDetail
+from app.core.db import get_session, Document
+from app.services.document_parser import document_parser
+from app.webapi.schemas import DocumentDetail, DocumentOut
 
-router = APIRouter(prefix="/analysis", tags=["analysis"])
+router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-@router.post("/run/{doc_id}", response_model=AnalysisOut)
-async def run_analysis(doc_id: str):
+@router.get("", response_model=list[DocumentOut])
+async def list_documents():
     async with get_session() as session:
-        d = await session.get(Document, doc_id)
-        if not d:
-            raise HTTPException(404, "Document not found")
-
-    # -----------------------------
-    # Run analysis OUTSIDE session
-    # -----------------------------
-    try:
-        result = await run_analysis_for_text(
-            text=d.extracted_text,
-            context=d.meta_json,   # ← DocumentParser 메타 / 업로드 컨텍스트
-        )
-        status = "done"
-        if result.get("decision") == "report" and "Mock" in json.dumps(result, ensure_ascii=False):
-            status = "fallback"
-
-    except Exception as e:
-        result = {
-            "error": str(e),
-            "note": "analysis execution failed",
-        }
-        status = "failed"
-
-    # -----------------------------
-    # Persist result
-    # -----------------------------
-    async with get_session() as session:
-        a = Analysis(
-            id=str(uuid.uuid4()),
-            document_id=doc_id,
-            status=status,
-            result_json=json.dumps(result, ensure_ascii=False),
-        )
-        session.add(a)
-        await session.commit()
-
-        return AnalysisOut(
-            id=a.id,
-            document_id=doc_id,
-            status=a.status,
-            created_at=str(a.created_at),
-        )
-
-
-@router.get("/{analysis_id}", response_model=AnalysisDetail)
-async def get_analysis(analysis_id: str):
-    async with get_session() as session:
-        a = await session.get(Analysis, analysis_id)
-        if not a:
-            raise HTTPException(404, "Analysis not found")
-
-        return AnalysisDetail(
-            id=a.id,
-            document_id=a.document_id,
-            status=a.status,
-            created_at=str(a.created_at),
-            result=json.loads(a.result_json),
-        )
-
-
-@router.get("/by-document/{doc_id}", response_model=list[AnalysisOut])
-async def list_analyses_for_doc(doc_id: str):
-    async with get_session() as session:
-        res = await session.execute(
-            select(Analysis)
-            .where(Analysis.document_id == doc_id)
-            .order_by(Analysis.created_at.desc())
-        )
+        res = await session.execute(select(Document).order_by(Document.created_at.desc()))
         items = res.scalars().all()
-
-        return [
-            AnalysisOut(
-                id=i.id,
-                document_id=i.document_id,
-                status=i.status,
-                created_at=str(i.created_at),
-            )
-            for i in items
-        ]
+        return items
 
 
-@router.delete("/{analysis_id}")
-async def delete_analysis(analysis_id: str):
+@router.post("/upload", response_model=DocumentOut)
+async def upload_document(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "Filename is required")
+
+    doc_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix.lower()
+    stored_name = f"{doc_id}{ext}"
+    stored_path = Path("data/uploads") / stored_name
+    stored_path.parent.mkdir(parents=True, exist_ok=True)
+
+    content = await file.read()
+    with stored_path.open("wb") as f:
+        f.write(content)
+
+    text, meta = await document_parser.extract_text(str(stored_path))
+    title = Path(file.filename).stem or file.filename
+    content_type = file.content_type or "application/octet-stream"
+
+    doc = Document(
+        id=doc_id,
+        title=title,
+        filename=file.filename,
+        content_type=content_type,
+        stored_path=str(stored_path),
+        extracted_text=text,
+        meta_json=json.dumps(meta, ensure_ascii=False),
+    )
+
     async with get_session() as session:
-        a = await session.get(Analysis, analysis_id)
-        if not a:
-            raise HTTPException(404, "Analysis not found")
-
-        await session.delete(a)
+        session.add(doc)
         await session.commit()
+        await session.refresh(doc)
+        return doc
+
+
+@router.get("/{doc_id}", response_model=DocumentDetail)
+async def get_document(doc_id: str):
+    async with get_session() as session:
+        doc = await session.get(Document, doc_id)
+        if not doc:
+            raise HTTPException(404, "Document not found")
+        return doc
+
+
+@router.delete("/{doc_id}")
+async def delete_document(doc_id: str):
+    async with get_session() as session:
+        doc = await session.get(Document, doc_id)
+        if not doc:
+            raise HTTPException(404, "Document not found")
+        stored_path = doc.stored_path
+        await session.delete(doc)
+        await session.commit()
+
+    if stored_path and os.path.exists(stored_path):
+        try:
+            os.remove(stored_path)
+        except OSError:
+            pass
 
     return {"ok": True}
