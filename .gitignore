@@ -55,3 +55,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+
+# local sqlite db
+backend/data/*.db
+
