@@ -27,6 +27,7 @@
 - **LLM**: Upstage Solar (solar-pro2)
 - **Database**: SQLite (SQLAlchemy)
 - **Parsing**: Upstage Document Parse, python-docx, pypdf
+- **Observability**: LangSmith (https://smith.langchain.com)
 
 ### Frontend
 - **Framework**: React 18 (Vite)

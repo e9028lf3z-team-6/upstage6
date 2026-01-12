@@ -60,8 +60,7 @@ graph.set_entry_point("reader_persona")
 # context → split
 graph.add_edge("reader_persona", "split")
 
-# persona + split 둘 다 필요한 노드
-graph.add_edge("reader_persona", "persona_feedback")
+# persona_feedback는 split 결과가 필요하므로 split 이후에만 실행
 graph.add_edge("split", "persona_feedback")
 
 # --------------------------------------------------

@@ -1,6 +1,7 @@
 # app/graph/nodes/rewrite_node.py
 from app.agents import RewriteAssistAgent
 from app.graph.state import AgentState
+from app.observability.langsmith import traceable_timed
 
 rewrite_agent = RewriteAssistAgent()
 
@@ -9,6 +10,7 @@ def extract_issues(result: dict | None):
         return []
     return result.get("issues", [])
 
+@traceable_timed(name="rewrite")
 def rewrite_node(state: AgentState) -> AgentState:
     result = rewrite_agent.run(
         original_text=state["original_text"],
@@ -23,6 +25,5 @@ def rewrite_node(state: AgentState) -> AgentState:
     )
 
     return {
-        **state,
         "rewrite_guidelines": result
     }
