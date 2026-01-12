@@ -14,7 +14,7 @@ __pycache__/
 venv/
 env/
 ENV/
-
+backend/.venv
 # ===============================
 # Environment Variables
 # ===============================
@@ -54,3 +54,20 @@ dist/
 # uv / dependency
 # ===============================
 .python-version
+
+
+# ===============================
+# Frontend (Node.js)
+# ===============================
+node_modules/
+frontend/node_modules/
+
+# Vite / React / Next build outputs
+frontend/dist/
+frontend/build/
+
+# Node logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
