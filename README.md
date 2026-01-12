@@ -26,7 +26,7 @@
 ### 1) 백엔드
 ```bash
 cd backend
-cp .env.example .env   # (선택) UPSTAGE_API_KEY 등 설정
+cp .env .env   # (선택) UPSTAGE_API_KEY 등 설정
 python -m venv .venv
 # Windows:
 .venv\Scripts\activate
@@ -40,7 +40,7 @@ uvicorn main:app --reload --port 8000
 ### 2) 프론트엔드
 ```bash
 cd frontend
-# (선택) cp .env.example .env
+# (선택) cp .env .env
 npm install
 npm run dev
 ```

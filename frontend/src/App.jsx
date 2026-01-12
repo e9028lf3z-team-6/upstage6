@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { deleteAnalysis, deleteDocument, getAnalysis, getDocument, listAnalysesByDoc, listDocuments, runAnalysis, uploadDocument } from './api.js'
 
 function pretty(obj) {
@@ -132,6 +133,7 @@ export default function App() {
 
   const readerLevel = activeAnalysis?.result?.final_metric?.reader_level
   const mode = activeAnalysis?.result?.debug?.mode || (activeAnalysis ? 'upstage_pipeline' : null)
+  const reportMarkdown = activeAnalysis?.result?.report?.full_report_markdown
 
   return (
     <div style={{display:'grid', gridTemplateColumns:'320px 1fr 520px', height:'100vh', gap:12, padding:12}}>
@@ -261,15 +263,28 @@ export default function App() {
 
         {activeAnalysis && (
           <div style={{marginTop:12}}>
-            <div className="card" style={{padding:12}}>
-              <div style={{fontWeight:700}}>요약</div>
-              <div className="muted" style={{fontSize:13, marginTop:6}}>
-                {activeAnalysis.result?.aggregate?.summary || '—'}
+            
+            {/* 1. 종합 리포트 (Markdown) */}
+            {reportMarkdown ? (
+              <div className="card" style={{padding:16, background:'#202022', marginBottom:12}}>
+                <div style={{fontWeight:700, marginBottom:12, borderBottom:'1px solid #444', paddingBottom:8, fontSize:14}}>
+                  📝 종합 분석 리포트 (Chief Editor)
+                </div>
+                <div className="markdown-body" style={{fontSize:14, lineHeight:1.6}}>
+                  <ReactMarkdown>{reportMarkdown}</ReactMarkdown>
+                </div>
               </div>
-            </div>
+            ) : (
+              // fallback: summary
+              <div className="card" style={{padding:12, marginBottom:12}}>
+                <div style={{fontWeight:700}}>요약</div>
+                <div className="muted" style={{fontSize:13, marginTop:6}}>
+                  {activeAnalysis.result?.aggregate?.summary || '—'}
+                </div>
+              </div>
+            )}
 
-            <div style={{height:12}} />
-
+            {/* 2. Raw JSON */}
             <div className="card" style={{padding:12}}>
               <div style={{fontWeight:700, marginBottom:8}}>Raw JSON</div>
               <pre className="mono" style={{whiteSpace:'pre-wrap', fontSize:12, lineHeight:1.5}}>
