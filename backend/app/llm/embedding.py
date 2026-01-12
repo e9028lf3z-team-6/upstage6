@@ -1,5 +1,5 @@
 from typing import List
-from app.llm.client import get_upstage_client
+from backend.app.llm.client import get_upstage_client
 
 EMBEDDING_MODEL = "embedding-query"
 # (= solar-embedding-1-large-query)

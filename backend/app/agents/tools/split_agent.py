@@ -1,6 +1,6 @@
-from app.agents.base import BaseAgent
-from app.llm.chat import chat
-from app.llm.embedding import embed_text
+from backend.app.agents.base import BaseAgent
+from backend.app.llm.chat import chat
+from backend.app.llm.embedding import embed_text
 
 """
 [SplitAgent]

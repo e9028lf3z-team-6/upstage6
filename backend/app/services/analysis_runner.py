@@ -1,10 +1,10 @@
 import os
 from typing import Any, Dict
 
-from app.core.settings import get_settings
+from backend.app.core.settings import get_settings
 
 # Reuse the existing pipeline from the provided agent implementation
-from app.services.pipeline_runner import run_full_pipeline
+from backend.app.services.pipeline_runner import run_full_pipeline
 
 async def run_analysis_for_text(text: str) -> Dict[str, Any]:
     """Run the full multi-agent pipeline.
