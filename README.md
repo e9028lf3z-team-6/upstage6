@@ -7,8 +7,9 @@
 
 ## 🚀 Key Features
 
-- **다양한 문서 지원**: PDF, DOCX, TXT, MD 파일의 텍스트를 정확하게 추출합니다.
-  - *Upstage Document Parse* 연동을 통한 고성능 파싱 지원 (Fallback: 로컬 파서).
+- **다양한 문서 지원**: PDF, DOCX, HWP, HWPX, TXT, MD 파일의 텍스트를 정확하게 추출합니다.
+  - *Upstage Document Parse* 연동을 통한 고성능 파싱 지원.
+  - *Robust Local Fallback*: HWP(Record Parsing), HWPX(XML), PDF/DOCX 자체 파서 내장.
 - **지능형 멀티 에이전트 파이프라인**:
   - **Narrative Analyst**: 스토리의 인과관계와 긴장도 곡선을 분석합니다.
   - **Tone & Style Expert**: 문체와 가독성 수준을 평가합니다.
