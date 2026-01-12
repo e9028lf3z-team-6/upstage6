@@ -39,7 +39,7 @@ async def run_analysis_for_text(
     spelling = {"issues": []}
 
     aggregated = {
-        "decision": "report",
+        "decision": "pass",
         "has_issues": any([
             tone["issues"],
             logic["issues"],
@@ -82,3 +82,23 @@ async def run_analysis_for_text(
         "aggregated": aggregated,
         "rewrite_guidelines": None,
     }
+
+
+def _heuristic_tone(_text: str) -> Dict[str, Any]:
+    return {"issues": [], "note": "heuristic_tone_stub"}
+
+
+def _heuristic_causality(_text: str) -> Dict[str, Any]:
+    return {"issues": [], "note": "heuristic_causality_stub"}
+
+
+def _heuristic_trauma(_text: str) -> Dict[str, Any]:
+    return {"issues": [], "note": "heuristic_trauma_stub"}
+
+
+def _heuristic_hate_bias(_text: str) -> Dict[str, Any]:
+    return {"issues": [], "note": "heuristic_hate_bias_stub"}
+
+
+def _heuristic_genre_cliche(_text: str) -> Dict[str, Any]:
+    return {"issues": [], "note": "heuristic_genre_cliche_stub"}
