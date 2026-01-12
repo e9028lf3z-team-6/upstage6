@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.schemas.agent import AgentRequest
-from app.services.pipeline_runner import run_full_pipeline
+from backend.app.schemas.agent import AgentRequest
+from backend.app.services.pipeline_runner import run_full_pipeline
 
 router = APIRouter(prefix="/dev", tags=["dev-metric"])
 
