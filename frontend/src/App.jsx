@@ -134,9 +134,41 @@ export default function App() {
   const readerLevel = activeAnalysis?.result?.final_metric?.reader_level
   const mode = activeAnalysis?.result?.debug?.mode || (activeAnalysis ? 'upstage_pipeline' : null)
   const reportMarkdown = activeAnalysis?.result?.report?.full_report_markdown
+  const qaScores = activeAnalysis?.result?.qa_scores
 
   return (
     <div style={{display:'grid', gridTemplateColumns:'320px 1fr 520px', height:'100vh', gap:12, padding:12}}>
+      {/* QA Scores Floating Box */}
+      {qaScores && Object.keys(qaScores).length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          left: 24,
+          background: 'rgba(27, 27, 31, 0.9)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid #333',
+          borderRadius: 8,
+          padding: '12px 16px',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          minWidth: 160
+        }}>
+          <div style={{fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5}}>Agent QA Scores</div>
+          <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+            {Object.entries(qaScores).map(([name, score]) => (
+              <div key={name} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20}}>
+                <span style={{fontSize: 13, color: '#cfcfd6', textTransform: 'capitalize'}}>{name.replace('_', ' ')}</span>
+                <span style={{
+                  fontSize: 13, 
+                  fontWeight: 700, 
+                  color: score >= 80 ? '#4caf50' : score >= 60 ? '#ffb74d' : '#f44336'
+                }}>{score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Left: history */}
       <div className="card" style={{padding:12, overflow:'auto'}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
