@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from sqlalchemy import select
 
 from app.core.db import get_session, Document
-from app.services.document_parser import document_parser
+from app.services.document_parser import document_parser, SUPPORTED_EXT
 from app.webapi.schemas import DocumentOut, DocumentDetail
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -21,8 +21,8 @@ async def list_documents():
 @router.post("/upload", response_model=DocumentOut)
 async def upload_document(file: UploadFile = File(...)):
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".pdf",".docx",".txt",".md"}:
-        raise HTTPException(400, f"Unsupported file type: {ext}. Use PDF/DOCX/TXT/MD.")
+    if ext not in SUPPORTED_EXT:
+        raise HTTPException(400, f"Unsupported file type: {ext}. Use {sorted(SUPPORTED_EXT)}.")
 
     doc_id = str(uuid.uuid4())
     safe_name = f"{doc_id}{ext}"
