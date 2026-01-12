@@ -1,9 +1,11 @@
 # app/graph/nodes/causality_node.py
 from app.agents import CausalityEvaluatorAgent
 from app.graph.state import AgentState
+from app.observability.langsmith import traceable_timed
 
 causality_agent = CausalityEvaluatorAgent()
 
+@traceable_timed(name="logic")
 def causality_node(state: AgentState) -> AgentState:
     reader_context = None
 
@@ -19,6 +21,5 @@ def causality_node(state: AgentState) -> AgentState:
     )
 
     return {
-        **state,
         "causality_result": result
     }
