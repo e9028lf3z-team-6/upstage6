@@ -9,13 +9,13 @@ from app.webapi.schemas import AnalysisOut, AnalysisDetail
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 @router.post("/run/{doc_id}", response_model=AnalysisOut)
-async def run_analysis(doc_id: str):
+async def run_analysis(doc_id: str, use_langgraph: bool = False):
     async with get_session() as session:
         d = await session.get(Document, doc_id)
         if not d:
             raise HTTPException(404, "Document not found")
 
-        result = await run_analysis_for_text(d.extracted_text)
+        result = await run_analysis_for_text(d.extracted_text, use_langgraph=use_langgraph)
 
         a = Analysis(
             id=str(uuid.uuid4()),

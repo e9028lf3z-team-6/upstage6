@@ -5,14 +5,17 @@ from app.core.settings import get_settings
 
 # Reuse the existing pipeline from the provided agent implementation
 from app.services.pipeline_runner import run_full_pipeline
+from app.langgraph.graph import run_langgraph_pipeline
 
-async def run_analysis_for_text(text: str) -> Dict[str, Any]:
+async def run_analysis_for_text(text: str, *, use_langgraph: bool = False) -> Dict[str, Any]:
     """Run the full multi-agent pipeline.
 
     If UPSTAGE_API_KEY is missing, we still return a deterministic, local-only result
     so the app can be demoed without external calls.
     """
     settings = get_settings()
+    if use_langgraph and settings.upstage_api_key:
+        return run_langgraph_pipeline(text, debug=True)
     if settings.upstage_api_key:
         return run_full_pipeline(text, debug=True)
 
