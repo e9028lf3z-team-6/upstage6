@@ -1,6 +1,7 @@
 # app/graph/nodes/report_node.py
 from app.agents import ComprehensiveReportAgent
 from app.graph.state import AgentState
+from app.observability.langsmith import traceable_timed
 
 report_agent = ComprehensiveReportAgent()
 
@@ -9,6 +10,7 @@ def extract_issues(result: dict | None):
         return []
     return result.get("issues", [])
 
+@traceable_timed(name="report")
 def report_node(state: AgentState) -> AgentState:
     report = report_agent.run(
         split_text=state["split_text"],
@@ -21,6 +23,5 @@ def report_node(state: AgentState) -> AgentState:
     )
 
     return {
-        **state,
         "final_report": report
     }
