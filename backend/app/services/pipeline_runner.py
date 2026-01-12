@@ -1,22 +1,22 @@
 # app/services/pipeline_runner.py
 
-from app.agents.tools.split_agent import SplitAgent
-from app.agents.tools.tone_agent import ToneEvaluatorAgent
-from app.agents.tools.causality_agent import CausalityEvaluatorAgent
-from app.agents.tools.TensionCurve_agent import TensionCurveAgent
+from backend.app.agents.tools.split_agent import SplitAgent
+from backend.app.agents.tools.tone_agent import ToneEvaluatorAgent
+from backend.app.agents.tools.causality_agent import CausalityEvaluatorAgent
+from backend.app.agents.tools.TensionCurve_agent import TensionCurveAgent
 
-from app.agents.tools.Trauma_agent import TraumaAgent
-from app.agents.tools.HateBias_agent import HateBiasAgent
-from app.agents.tools.GenerCliche_agent import GenreClicheAgent
-from app.agents.tools.Spelling_Agent import SpellingAgent
+from backend.app.agents.tools.Trauma_agent import TraumaAgent
+from backend.app.agents.tools.HateBias_agent import HateBiasAgent
+from backend.app.agents.tools.GenerCliche_agent import GenreClicheAgent
+from backend.app.agents.tools.Spelling_Agent import SpellingAgent
 
-from app.agents.tools.render_persona import ReaderPersonaAgent
-from app.agents.tools.persona_feedback import PersonaFeedbackAgent
+from backend.app.agents.tools.render_persona import ReaderPersonaAgent
+from backend.app.agents.tools.persona_feedback import PersonaFeedbackAgent
 
-from app.agents.tools.llm_aggregator import IssueBasedAggregatorAgent
-from app.agents.tools.rewrrite_assist import RewriteAssistAgent
+from backend.app.agents.tools.llm_aggregator import IssueBasedAggregatorAgent
+from backend.app.agents.tools.rewrrite_assist import RewriteAssistAgent
 
-from app.agents.metrics.final_metric import FinalMetricAgent
+from backend.app.agents.metrics.final_metric import FinalMetricAgent
 
 
 # ---- singleton instances
