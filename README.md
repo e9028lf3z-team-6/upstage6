@@ -1,70 +1,111 @@
-# TEAM – CONTEXTOR (로컬호스트 웹)
+# 🖋️ TEAM CONTEXTOR
 
-업로드한 원고(PDF/DOCX/TXT/MD)를 **로컬에서 실행되는 웹(React) + API(FastAPI)** 로 분석 데모버전.
+> **원고 분석을 위한 지능형 멀티 에이전트 시스템**  
+> 업로드한 원고(PDF/DOCX/TXT/MD)를 분석하여 가독성, 톤, 인과관계, 부적절한 표현 등을 체크하고 종합적인 전문가 리포트를 제공합니다.
 
-- 좌측: 원고/분석 기록 목록 + 삭제
-- 중앙: 원고 텍스트 뷰어 (업로드 후 추출된 텍스트 표시)
-- 우측: 멀티 에이전트 분석 결과(JSON) 및 요약
+---
 
-## 핵심 요구사항 반영
+## 🚀 Key Features
 
-- **문서 인풋 다양화**: PDF/DOCX 업로드 → 텍스트 추출  
-  - `UPSTAGE_API_KEY`가 있으면 Upstage Document Parse를 우선 시도  
-  - 키가 없으면 로컬 파서(PDF: pypdf, DOCX: python-docx)로 폴백
-- **멀티 에이전트 파이프라인**:
-  - (1) 분리(독자 수준 분류) → 평가
-  - (2) 말투 분석 → 평가
-  - (3) 인과관계/긴장도/장르 클리셰 → 평가
-  - (4) 부적절 표현(트라우마/혐오) → 평가
-  - (5) 통합 → 최종 평가(독자 수준, 메트릭)
+- **다양한 문서 지원**: PDF, DOCX, TXT, MD 파일의 텍스트를 정확하게 추출합니다.
+  - *Upstage Document Parse* 연동을 통한 고성능 파싱 지원 (Fallback: 로컬 파서).
+- **지능형 멀티 에이전트 파이프라인**:
+  - **Narrative Analyst**: 스토리의 인과관계와 긴장도 곡선을 분석합니다.
+  - **Tone & Style Expert**: 문체와 가독성 수준을 평가합니다.
+  - **Safety Guard**: 트라우마 유발 요소나 혐오 표현을 탐지합니다.
+  - **Genre Specialist**: 장르적 클리셰와 독창성을 분석합니다.
+- **Chief Editor's Report**: 분산된 에이전트의 분석 결과를 하나의 전문적인 Markdown 리포트로 합성하여 제공합니다.
+- **실시간 대시보드**: React 기반의 반응형 UI로 분석 결과를 즉시 확인하고 관리할 수 있습니다.
 
-> 참고: `UPSTAGE_API_KEY`가 없으면 외부 LLM 호출 없이 **로컬 휴리스틱 모드**로 동작하여,
-> 로컬호스트에서 UI/DB/흐름을 바로 시연할 수 있습니다.
+---
 
-## 실행 방법 (로컬)
+## 🛠 Tech Stack
 
-### 1) 백엔드
+### Backend
+- **Framework**: FastAPI (Python 3.11+)
+- **LLM**: Upstage Solar (solar-pro2)
+- **Database**: SQLite (SQLAlchemy)
+- **Parsing**: Upstage Document Parse, python-docx, pypdf
+
+### Frontend
+- **Framework**: React 18 (Vite)
+- **UI/UX**: Modern CSS, Material Design Principles
+- **Rendering**: react-markdown
+
+---
+
+## ⚙️ Getting Started
+
+### 1. Prerequisites
+- Python 3.11 이상
+- Node.js 18 이상
+
+### 2. Backend Setup
 ```bash
 cd backend
-cp .env .env   # (선택) UPSTAGE_API_KEY 등 설정
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-# source .venv/bin/activate
 
+# 가상환경 생성 및 활성화
+python -m venv .venv
+# Windows: .venv\Scripts\activate | macOS/Linux: source .venv/bin/activate
+
+# 의존성 설치
 pip install -e .
+
+# 환경 변수 설정
+cp .env.example .env
+# .env 파일을 열어 UPSTAGE_API_KEY를 입력하세요.
+
+# 서버 실행
 uvicorn main:app --reload --port 8000
 ```
 
-### 2) 프론트엔드
+### 3. Frontend Setup
 ```bash
 cd frontend
-# (선택) cp .env .env
+
+# 의존성 설치
 npm install
+
+# 개발 서버 실행
 npm run dev
 ```
 
-- 브라우저: http://localhost:5173
-- API: http://localhost:8000/docs
+- **App URL**: [http://localhost:5173](http://localhost:5173)
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## API 요약
+---
 
-- `POST /api/documents/upload` : 문서 업로드
-- `GET  /api/documents` : 문서 목록
-- `GET  /api/documents/{id}` : 문서 상세(추출 텍스트 포함)
-- `POST /api/analysis/run/{doc_id}` : 분석 실행(결과는 DB 저장)
-- `GET  /api/analysis/{analysis_id}` : 분석 상세(JSON)
+## 📂 Project Structure
 
-## 저장소(DB)
-
-- SQLite: `backend/data/team.db`
-- 업로드 파일: `backend/data/uploads/`
-
-## 폴더 구조
+```text
+upstage6/
+├── backend/
+│   ├── app/
+│   │   ├── agents/      # 지능형 에이전트 로직 (Tone, Causality, Report 등)
+│   │   ├── api/         # FastAPI 라우터 및 엔드포인트
+│   │   ├── core/        # DB 및 설정 관리
+│   │   └── services/    # 파이프라인 오케스트레이션
+│   └── data/            # SQLite DB 및 업로드 파일 저장소
+├── frontend/
+│   ├── src/
+│   │   ├── api.js       # 백엔드 API 통신 레이어
+│   │   └── App.jsx      # 메인 UI 및 결과 뷰어
+│   └── public/
+└── README.md
 ```
-TEAM/
-  backend/   # FastAPI
-  frontend/  # React(Vite)
-  docs/      # 기획/도식/화면 참고 이미지
-```
+
+---
+
+## 📄 API Overview
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/documents/upload` | 문서 업로드 및 텍스트 추출 |
+| `GET` | `/api/documents` | 업로드된 문서 목록 조회 |
+| `POST` | `/api/analysis/run/{id}` | 멀티 에이전트 분석 실행 |
+| `GET` | `/api/analysis/{id}` | 최종 리포트 및 상세 데이터 조회 |
+
+---
+
+## ⚖️ License
+This project is developed for the **Upstage AI Lab** program.
