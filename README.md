@@ -15,6 +15,9 @@
   - **Tone & Style Expert**: 문체와 가독성 수준을 평가합니다.
   - **Safety Guard**: 트라우마 유발 요소나 혐오 표현을 탐지합니다.
   - **Genre Specialist**: 장르적 클리셰와 독창성을 분석합니다.
+- **Self-Evaluation System (New)**:
+  - **LLM-as-a-Judge**: 각 에이전트의 분석 결과를 별도의 평가 에이전트가 교차 검증하여 신뢰도 점수(QA Score)를 산출합니다.
+  - **Real-time Feedback**: 분석 즉시 각 에이전트의 성능 점수를 대시보드에서 확인할 수 있습니다.
 - **Chief Editor's Report**: 분산된 에이전트의 분석 결과를 하나의 전문적인 Markdown 리포트로 합성하여 제공합니다.
 - **실시간 대시보드**: React 기반의 반응형 UI로 분석 결과를 즉시 확인하고 관리할 수 있습니다.
 
