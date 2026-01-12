@@ -1,63 +1,44 @@
-# ======================
 # Python
-# ======================
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.so
-*.egg-info/
-dist/
-build/
 
-# ======================
 # Virtual Environment
-# ======================
 venv/
 .venv/
 env/
 ENV/
+backend/.venv
+# ===============================
+# Environment Variables
+# ===============================
+.env
+.env.*
 
-# ======================
-# PyCharm / IDE
-# ======================
 .idea/
 .vscode/
 *.iml
 
-# ======================
 # OS
-# ======================
 .DS_Store
 Thumbs.db
 
-# ======================
-# Logs
-# ======================
-*.log
-logs/
-
-# ======================
-# Environment variables
-# ======================
-.env
-.env.*
-!.env.example
-
-# ======================
-# Test / Cache
-# ======================
-.pytest_cache/
-.mypy_cache/
 .coverage
 htmlcov/
+.pytest_cache/
 
-# ======================
-# Jupyter
-# ======================
-.ipynb_checkpoints/
+# ===============================
+# Build / Distribution
+# ===============================
+build/
+dist/
+*.egg-info/
 
-# ======================
-# Docker
-# ======================
-docker-data/
+# ===============================
+# uv / dependency
+# ===============================
+.python-version
+
+
+
