@@ -24,6 +24,7 @@ async def run_analysis_for_text(
         return run_full_pipeline(
             text=text,
             context=context,
+            expected=None,
             debug=True,
         )
 
