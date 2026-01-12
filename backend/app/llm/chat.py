@@ -3,7 +3,7 @@ from app.observability.langsmith import create_llm_run
 
 CHAT_MODEL = "solar-pro2"
 
-def chat(prompt: str, system: str | None = None) -> str:
+def chat(prompt: str, system: str | None = None, temperature: float = 0.2) -> str:
     client = get_upstage_client()
 
     messages = []
@@ -14,7 +14,7 @@ def chat(prompt: str, system: str | None = None) -> str:
     res = client.chat.completions.create(
         model=CHAT_MODEL,
         messages=messages,
-        temperature=0.2,
+        temperature=temperature,
     )
     usage = getattr(res, "usage", None)
     usage_payload = None
