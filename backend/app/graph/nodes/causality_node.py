@@ -21,5 +21,5 @@ def causality_node(state: AgentState) -> AgentState:
     )
 
     return {
-        "causality_result": result
+        "logic_result": result
     }
