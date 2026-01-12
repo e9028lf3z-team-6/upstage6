@@ -11,14 +11,19 @@ class BaseAgent:
     """
 
     def _safe_json_load(self, text: str) -> dict:
-        """
-        LLM 출력에서 JSON 블록만 추출하여 dict로 변환
+        import json, re
 
-        - LLM이 설명/문장/개행을 섞어 출력하는 경우에도 대응
-        - JSON이 없으면 명확한 에러 발생
-        """
-        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not text:
+            return {"issues": []}
+
+        # 가장 바깥 JSON만 추출
+        match = re.search(r"\{[\s\S]*\}", text)
         if not match:
-            raise ValueError(f"LLM did not return valid JSON: {text}")
+            # JSON이 없으면 "문제 없음"으로 처리
+            return {"issues": []}
 
-        return json.loads(match.group())
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            return {"issues": []}
+
