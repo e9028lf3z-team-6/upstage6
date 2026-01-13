@@ -13,6 +13,8 @@ from app.graph.nodes.trauma_node import trauma_node
 from app.graph.nodes.hate_bias_node import hate_bias_node
 from app.graph.nodes.genre_cliche_node import genre_cliche_node
 from app.graph.nodes.spelling_node import spelling_node
+from app.graph.nodes.tension_curve_node import tension_curve_node
+from app.graph.nodes.qa_scores_node import qa_scores_node
 
 # core decision / output
 from app.graph.nodes.aggregate_node import aggregate_node
@@ -41,11 +43,13 @@ graph.add_node("trauma", trauma_node)
 graph.add_node("hate_bias", hate_bias_node)
 graph.add_node("genre_cliche", genre_cliche_node)
 graph.add_node("spelling", spelling_node)
+graph.add_node("tension_curve", tension_curve_node)
 
 # decision / output
 graph.add_node("aggregate", aggregate_node)
 graph.add_node("rewrite", rewrite_node)
 graph.add_node("report", report_node)
+graph.add_node("qa_scores", qa_scores_node)
 
 # --------------------------------------------------
 # Entry point
@@ -73,6 +77,7 @@ for node in [
     "hate_bias",
     "genre_cliche",
     "spelling",
+    "tension_curve",
 ]:
     graph.add_edge("split", node)
     graph.add_edge(node, "aggregate")
@@ -101,7 +106,8 @@ graph.add_conditional_edges(
 # Finalization
 # --------------------------------------------------
 graph.add_edge("rewrite", "report")
-graph.add_edge("report", END)
+graph.add_edge("report", "qa_scores")
+graph.add_edge("qa_scores", END)
 
 # --------------------------------------------------
 # Compile
