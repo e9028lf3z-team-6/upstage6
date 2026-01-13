@@ -33,14 +33,27 @@ async def run_analysis_for_text(
     - 항상 동일한 출력 스키마 반환
     """
 
-    settings = get_settings()
-
     if has_upstage_api_key():
         if mode == "full":
             return _run_langgraph_full(text=text, context=context, mode=mode)
         return _run_causality_only(text=text, mode=mode)
 
     return _run_fallback(text=text, mode=mode)
+
+
+def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) -> None:
+    settings = get_settings()
+    if not isinstance(split_payload, dict):
+        split_payload = {}
+
+    if settings.enable_normalized_issues:
+        normalized_issues, highlights = normalize_issues(result, split_payload)
+        result["normalized_issues"] = normalized_issues
+        result["highlights"] = highlights
+
+    if settings.enable_split_map:
+        result["split_sentences"] = split_payload.get("split_sentences")
+        result["split_map"] = split_payload.get("split_map")
 
 
 def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
@@ -83,11 +96,7 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
 
     result["final_metric"] = final_state.get("final_metric") or _run_final_evaluator(result)
     result["qa_scores"] = final_state.get("qa_scores") or _run_qa_scores(text, result, mode="full")
-    normalized_issues, highlights = normalize_issues(result, split_payload)
-    result["normalized_issues"] = normalized_issues
-    result["highlights"] = highlights
-    result["split_sentences"] = split_payload.get("split_sentences")
-    result["split_map"] = split_payload.get("split_map")
+    _apply_optional_outputs(result, split_payload)
 
     return result
 
@@ -148,11 +157,7 @@ def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
         "qa_scores": _run_qa_scores(text, {"causality": causality}, mode="causality_only"),
         "debug": {"mode": f"langgraph_{mode}"},
     }
-    normalized_issues, highlights = normalize_issues(result, split_result)
-    result["normalized_issues"] = normalized_issues
-    result["highlights"] = highlights
-    result["split_sentences"] = split_result.get("split_sentences")
-    result["split_map"] = split_result.get("split_map")
+    _apply_optional_outputs(result, split_result)
     return result
 
 
@@ -218,11 +223,7 @@ def _run_fallback(text: str, mode: str) -> Dict[str, Any]:
         "decision": None,
         "debug": {"mode": f"local_fallback_{mode}"},
     }
-    normalized_issues, highlights = normalize_issues(result, split)
-    result["normalized_issues"] = normalized_issues
-    result["highlights"] = highlights
-    result["split_sentences"] = split.get("split_sentences")
-    result["split_map"] = split.get("split_map")
+    _apply_optional_outputs(result, split)
     return result
 
 
