@@ -70,8 +70,8 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState(null)
 
-  //  업로드 화면 토글 (내부 저장소)
-  const [showUploader, setShowUploader] = useState(false)
+  // ✅ Left panel mode: 'list' | 'upload' | 'settings'
+  const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
 
   const fileRef = useRef(null)
@@ -128,13 +128,11 @@ export default function App() {
     return items
   }
 
-  // 앱 시작 시 문서 목록 로드 (로그인 여부와 무관)
   useEffect(() => {
     refreshDocs(true).catch(e => setError(String(e)))
     // eslint-disable-next-line
   }, [])
 
-  // activeDocId 변경 시 문서/분석 기록 로드
   useEffect(() => {
     if (!activeDocId) return
     setLoading(true); setError(null)
@@ -174,7 +172,7 @@ export default function App() {
   }, [isAnalyzing])
 
   // -----------------------------
-  //  공통 업로드 함수 (input/drag&drop 공용)
+  // ✅ 공통 업로드 함수 (input/drag&drop 공용)
   // -----------------------------
   async function uploadOneFile(file) {
     if (!file) return
@@ -186,11 +184,10 @@ export default function App() {
       await refreshDocs(false)
       setActiveDocId(doc.id)
 
-      // 업로드 화면 닫기
-      setShowUploader(false)
+      // 업로드 화면 닫기(원래 화면으로)
+      setLeftMode('list')
       setIsDragOver(false)
 
-      // input reset
       if (fileRef.current) fileRef.current.value = ''
       if (uploaderFileRef.current) uploaderFileRef.current.value = ''
 
@@ -202,14 +199,13 @@ export default function App() {
     }
   }
 
-  // 기존 "업로드" input (혹시 남겨둘 경우를 대비)
+  // 기존 input 방식 (혹시 남겨둘 경우 대비)
   async function onUpload(e) {
     const f = e.target.files?.[0]
     if (!f) return
     await uploadOneFile(f)
   }
 
-  // 업로더 화면 내 file picker
   async function onUploadFromUploader(e) {
     const f = e.target.files?.[0]
     if (!f) return
@@ -346,17 +342,23 @@ export default function App() {
   const canShowJson = !!activeAnalysis
 
   // -----------------------------
-  // Upload panel handlers
+  // Left: upload panel handlers
   // -----------------------------
   function openUploadPanel() {
-    setShowUploader(true)
+    setLeftMode('upload')
     setIsDragOver(false)
     setError(null)
   }
 
-  function closeUploadPanel() {
+  function openSettingsPanel() {
+    setLeftMode('settings')
+    setIsDragOver(false)
+    setError(null)
+  }
+
+  function closeLeftPanelToList() {
     if (isUploading) return
-    setShowUploader(false)
+    setLeftMode('list')
     setIsDragOver(false)
   }
 
@@ -381,6 +383,27 @@ export default function App() {
     const file = e.dataTransfer?.files?.[0]
     if (!file) return
     await uploadOneFile(file)
+  }
+
+  // -----------------------------
+  // ✅ Settings Button (bottom-right inside red box)
+  // -----------------------------
+  function SettingsIcon() {
+    return (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M12 15.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+        <path
+          d="M19.4 13.5c.04-.5.04-1 0-1.5l2-1.6a.7.7 0 0 0 .16-.9l-1.9-3.3a.7.7 0 0 0-.84-.3l-2.4 1a9.4 9.4 0 0 0-1.3-.75l-.36-2.6A.7.7 0 0 0 13.1 1h-3.8a.7.7 0 0 0-.7.6l-.36 2.6c-.45.2-.9.45-1.3.75l-2.4-1a.7.7 0 0 0-.84.3L1.78 7.5a.7.7 0 0 0 .16.9l2 1.6a9 9 0 0 0 0 1.5l-2 1.6a.7.7 0 0 0-.16.9l1.9 3.3a.7.7 0 0 0 .84.3l2.4-1c.4.3.85.55 1.3.75l.36 2.6a.7.7 0 0 0 .7.6h3.8a.7.7 0 0 0 .7-.6l.36-2.6c.45-.2.9-.45 1.3-.75l2.4 1a.7.7 0 0 0 .84-.3l1.9-3.3a.7.7 0 0 0-.16-.9l-2-1.6Z"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
   }
 
   return (
@@ -431,7 +454,16 @@ export default function App() {
       )}
 
       {/* Left */}
-      <div className="card" style={{padding:12, overflow:'auto'}}>
+      <div
+        className="card"
+        style={{
+          padding:12,
+          overflow:'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0
+        }}
+      >
         {/* User Profile Section */}
         <div style={{marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid #333'}}>
           {user ? (
@@ -473,14 +505,14 @@ export default function App() {
           )}
         </div>
 
-        {/* Top header + Upload button */}
+        {/* Header + Upload button */}
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
           <div>
             <div style={{fontSize:18, fontWeight:700}}>CONTEXTOR</div>
             <div className="muted" style={{fontSize:12}}>PDF/DOCX/HWP 업로드</div>
           </div>
 
-          {/* 업로드 버튼: 클릭하면 내부 저장소 업로드 화면으로 전환 */}
+          {/* 업로드 버튼: 누르면 파란 영역이 (upload/settings)로 바뀜 */}
           <button
             className="btn"
             onClick={openUploadPanel}
@@ -494,7 +526,6 @@ export default function App() {
             업로드
           </button>
 
-          {/* (기존 input 방식 유지하고 싶으면 숨김으로 남겨도 됨) */}
           <input
             ref={fileRef}
             type="file"
@@ -513,100 +544,156 @@ export default function App() {
           {isSavingDraft && <Badge>saving…</Badge>}
         </div>
 
-        {/* showUploader면: 원고목록 대신 "내부 저장소 업로드 화면" */}
-        {showUploader ? (
-          <div style={{marginTop:14}}>
-            {/* 초록색: 내부 저장소 헤더 */}
-            <div
-              className="card"
-              style={{
-                padding: 12,
-                border: '1px solid #2a2a2c',
-                background: 'rgba(46, 125, 50, 0.18)', // green-ish
-                marginBottom: 10
-              }}
-            >
-              <div style={{fontWeight: 800, fontSize: 16}}>파일을 드래그 & 드랍하거나 내부 저장소를 사용하세요</div>
-              <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+        {/* ✅ 파란 네모 영역 (스크롤 영역) */}
+        <div style={{marginTop:14, flex: 1, minHeight: 0}}>
+          {leftMode === 'upload' && (
+            <div>
+              {/* 내부 저장소 헤더 */}
+              <div
+                className="card"
+                style={{
+                  padding: 12,
+                  border: '1px solid #2a2a2c',
+                  background: 'rgba(46, 125, 50, 0.18)',
+                  marginBottom: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10
+                }}
+              >
+                <div>
+                  <div style={{fontWeight: 800, fontSize: 16}}>내부저장소</div>
+                  <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+                    파일을 업로드하거나 드래그 앤 드롭하세요.
+                  </div>
+                </div>
 
-              </div>
-            </div>
-
-            {/* 파란색: Drag & Drop Zone */}
-            <div
-              className="card"
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop}
-              style={{
-                padding: 14,
-                border: `1px dashed ${isDragOver ? '#6aa9ff' : '#2a2a2c'}`,
-                background: isDragOver ? 'rgba(50, 100, 200, 0.22)' : 'rgba(50, 100, 200, 0.12)',
-                minHeight: 180,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                gap: 10
-              }}
-            >
-              <div style={{fontSize: 13, fontWeight: 700}}>
-                {isDragOver ? '여기에 놓으세요' : '마우스로 파일을 드래그해서 드랍하세요'}
-              </div>
-              <div className="muted" style={{fontSize: 12}}>
-                지원 확장자: <span className="mono">.pdf .docx .txt .md .hwp .hwpx</span>
-              </div>
-
-              <div style={{display:'flex', gap:10, alignItems:'center', marginTop: 6}}>
-                <label
+                {/* ✅ 되돌리기 버튼: 파란 네모 안 오른쪽 상단 */}
+                <button
                   className="btn"
+                  onClick={closeLeftPanelToList}
+                  disabled={isUploading}
                   style={{
-                    display:'inline-flex',
-                    alignItems:'center',
-                    gap:8,
                     opacity: isUploading ? 0.7 : 1,
                     cursor: isUploading ? 'not-allowed' : 'pointer',
-                    pointerEvents: isUploading ? 'none' : 'auto',
+                    height: 34
                   }}
-                  title={isUploading ? '업로드 중…' : '파일 선택'}
+                  title="되돌아오기"
                 >
-                  <span>{isUploading ? '업로드 중…' : '파일 선택'}</span>
-                  <input
-                    ref={uploaderFileRef}
-                    type="file"
-                    accept=".pdf,.docx,.txt,.md,.hwp,.hwpx"
-                    onChange={onUploadFromUploader}
-                    style={{display:'none'}}
-                    disabled={isUploading}
-                  />
-                </label>
+                  되돌리기
+                </button>
+              </div>
 
-                {isUploading && (
-                  <div className="muted" style={{fontSize: 12}}>
-                    업로드중입니다… 잠시만 기다려주세요.
-                  </div>
-                )}
+              {/* Drag & Drop Zone */}
+              <div
+                className="card"
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+                style={{
+                  padding: 14,
+                  border: `1px dashed ${isDragOver ? '#6aa9ff' : '#2a2a2c'}`,
+                  background: isDragOver ? 'rgba(50, 100, 200, 0.22)' : 'rgba(50, 100, 200, 0.12)',
+                  minHeight: 220,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  gap: 10
+                }}
+              >
+                <div style={{fontSize: 13, fontWeight: 700}}>
+                  {isDragOver ? '여기에 놓으세요' : '마우스로 파일을 드래그해서 드랍하세요'}
+                </div>
+                <div className="muted" style={{fontSize: 12}}>
+                  지원 확장자: <span className="mono">.pdf .docx .txt .md .hwp .hwpx</span>
+                </div>
+
+                <div style={{display:'flex', gap:10, alignItems:'center', marginTop: 6}}>
+                  <label
+                    className="btn"
+                    style={{
+                      display:'inline-flex',
+                      alignItems:'center',
+                      gap:8,
+                      opacity: isUploading ? 0.7 : 1,
+                      cursor: isUploading ? 'not-allowed' : 'pointer',
+                      pointerEvents: isUploading ? 'none' : 'auto',
+                    }}
+                    title={isUploading ? '업로드 중…' : '파일 선택'}
+                  >
+                    <span>{isUploading ? '업로드 중…' : '파일 선택'}</span>
+                    <input
+                      ref={uploaderFileRef}
+                      type="file"
+                      accept=".pdf,.docx,.txt,.md,.hwp,.hwpx"
+                      onChange={onUploadFromUploader}
+                      style={{display:'none'}}
+                      disabled={isUploading}
+                    />
+                  </label>
+
+                  {isUploading && (
+                    <div className="muted" style={{fontSize: 12}}>
+                      업로드중입니다… 잠시만 기다려주세요.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          )}
 
-            {/* 하단: 되돌아오기 */}
-            <button
-              className="btn"
-              onClick={closeUploadPanel}
-              disabled={isUploading}
-              style={{
-                width: '100%',
-                marginTop: 12,
-                opacity: isUploading ? 0.7 : 1,
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              되돌아오기
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* 원고 목록 */}
-            <div style={{marginTop:14}}>
+          {leftMode === 'settings' && (
+            <div>
+              {/* ✅ 설정 화면 (빈칸) + 되돌리기 버튼: 오른쪽 상단 */}
+              <div
+                className="card"
+                style={{
+                  padding: 12,
+                  border: '1px solid #2a2a2c',
+                  background: '#141417',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10
+                }}
+              >
+                <div>
+                  <div style={{fontWeight: 800, fontSize: 16}}>설정</div>
+                  <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+                    (설정 항목은 추후 추가 예정)
+                  </div>
+                </div>
+
+                <button
+                  className="btn"
+                  onClick={closeLeftPanelToList}
+                  style={{height: 34}}
+                  title="되돌리기"
+                >
+                  되돌리기
+                </button>
+              </div>
+
+              {/* 빈 설정 내용 영역 */}
+              <div
+                className="card"
+                style={{
+                  marginTop: 10,
+                  padding: 14,
+                  minHeight: 320,
+                  border: '1px solid #2a2a2c',
+                  background: '#0f0f12'
+                }}
+              >
+                {/* intentionally empty */}
+              </div>
+            </div>
+          )}
+
+          {leftMode === 'list' && (
+            <>
+              {/* 원고 목록 */}
               <div className="muted" style={{fontSize:12, marginBottom:8}}>원고 목록</div>
               {docs.map(d => (
                 <div key={d.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
@@ -634,36 +721,36 @@ export default function App() {
                   </button>
                 </div>
               ))}
-            </div>
 
-            {/* 분석 기록 */}
-            <div style={{marginTop:18}}>
-              <div className="muted" style={{fontSize:12, marginBottom:8}}>분석 기록</div>
-              {analyses.length === 0 && <div className="muted" style={{fontSize:13}}>아직 분석이 없습니다.</div>}
-              {analyses.map(a => (
-                <div key={a.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
-                  <button className="btn" onClick={() => openAnalysis(a.id)} style={{flex:1, textAlign:'left'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', gap:10}}>
-                      <span className="mono" style={{fontSize:12}}>{a.id.slice(0,8)}…</span>
-                      <span className="muted" style={{fontSize:12}}>{a.status}</span>
-                    </div>
-                    <div className="muted" style={{fontSize:12, marginTop:3}}>{a.created_at}</div>
-                  </button>
+              {/* 분석 기록 */}
+              <div style={{marginTop:18}}>
+                <div className="muted" style={{fontSize:12, marginBottom:8}}>분석 기록</div>
+                {analyses.length === 0 && <div className="muted" style={{fontSize:13}}>아직 분석이 없습니다.</div>}
+                {analyses.map(a => (
+                  <div key={a.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
+                    <button className="btn" onClick={() => openAnalysis(a.id)} style={{flex:1, textAlign:'left'}}>
+                      <div style={{display:'flex', justifyContent:'space-between', gap:10}}>
+                        <span className="mono" style={{fontSize:12}}>{a.id.slice(0,8)}…</span>
+                        <span className="muted" style={{fontSize:12}}>{a.status}</span>
+                      </div>
+                      <div className="muted" style={{fontSize:12, marginTop:3}}>{a.created_at}</div>
+                    </button>
 
-                  <button
-                    className="btn"
-                    title={isAnalyzing ? '분석 중에는 삭제할 수 없습니다.' : '삭제'}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteAnalysis(a.id) }}
-                    disabled={loading || isAnalyzing || isSavingDraft || isUploading}
-                    style={{width:56, display:'grid', placeItems:'center'}}
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+                    <button
+                      className="btn"
+                      title={isAnalyzing ? '분석 중에는 삭제할 수 없습니다.' : '삭제'}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteAnalysis(a.id) }}
+                      disabled={loading || isAnalyzing || isSavingDraft || isUploading}
+                      style={{width:56, display:'grid', placeItems:'center'}}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Error (Left에도 표시) */}
         {error && (
@@ -672,6 +759,39 @@ export default function App() {
             <div className="mono" style={{fontSize:12, whiteSpace:'pre-wrap'}}>{error}</div>
           </div>
         )}
+
+        {/* ✅ 빨간 네모 영역: 하단 바 + 오른쪽에 설정 버튼 */}
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 10,
+            borderTop: '1px solid #333',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 10
+          }}
+        >
+          <div className="muted" style={{fontSize: 12}}>
+            {/* 왼쪽 하단은 일단 비워둠 */}
+          </div>
+
+          <button
+            className="btn"
+            onClick={openSettingsPanel}
+            disabled={isUploading}
+            title="설정"
+            style={{
+              width: 52,
+              height: 46,
+              display: 'grid',
+              placeItems: 'center',
+              padding: 0
+            }}
+          >
+            <SettingsIcon />
+          </button>
+        </div>
       </div>
 
       {/* Center */}
