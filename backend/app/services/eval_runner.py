@@ -17,6 +17,7 @@ from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
 from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
 from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
 from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
+from app.observability.langsmith import create_feedback, traceable
 
 
 def _truncate_report(text: str) -> str:
@@ -563,6 +564,138 @@ def compute_quality_score(
     }
 
 
+def _add_feedback_entry(
+    entries: list[dict],
+    key: str,
+    *,
+    score: float | None = None,
+    value: Any | None = None,
+    comment: str | None = None,
+) -> None:
+    if score is None and value is None and comment is None:
+        return
+    entry: dict[str, Any] = {"key": key}
+    if score is not None:
+        entry["score"] = float(score)
+    if value is not None:
+        entry["value"] = value
+    if comment:
+        entry["comment"] = comment
+    entries.append(entry)
+
+
+def _build_langsmith_feedback(
+    metrics: dict,
+    scores: dict,
+    agent_metrics: dict,
+    meta: dict,
+    agent_latencies: dict,
+    consistency_score: float | None,
+) -> list[dict]:
+    entries: list[dict] = []
+
+    schema_details = scores.get("schema_ok_details") or {}
+    if isinstance(schema_details, dict):
+        for key in ["has_report", "decision_ok", "report_len_ok"]:
+            if key in schema_details:
+                _add_feedback_entry(
+                    entries,
+                    key,
+                    score=1.0 if schema_details.get(key) else 0.0,
+                )
+        report_len = _safe_number(schema_details.get("report_len"))
+        if report_len is not None:
+            _add_feedback_entry(entries, "report_len", score=report_len)
+
+    llm_status = scores.get("llm_judge_status")
+    for key in [
+        "llm_judge_clarity",
+        "llm_judge_usefulness",
+        "llm_judge_consistency",
+        "llm_judge_structure",
+        "llm_judge_actionability",
+        "llm_judge_overall",
+    ]:
+        value = _safe_number(scores.get(key))
+        if value is None:
+            continue
+        comment = None
+        if key == "llm_judge_overall" and llm_status:
+            comment = f"status={llm_status}"
+        _add_feedback_entry(entries, key, score=value, comment=comment)
+    if scores.get("llm_judge_rationale"):
+        _add_feedback_entry(entries, "llm_judge_rationale", value=scores.get("llm_judge_rationale"))
+    if scores.get("quality_rationale_ko"):
+        _add_feedback_entry(entries, "quality_rationale_ko", value=scores.get("quality_rationale_ko"))
+
+    _add_feedback_entry(entries, "schema_ok", score=_safe_number(scores.get("schema_ok")))
+    _add_feedback_entry(entries, "quality_score_v2", score=_safe_number(scores.get("quality_score_v2")))
+
+    _add_feedback_entry(entries, "has_issues", score=1.0 if metrics.get("has_issues") else 0.0)
+    _add_feedback_entry(entries, "decision", value=str(metrics.get("decision")) if metrics.get("decision") else None)
+    _add_feedback_entry(entries, "dominant_issue", value=str(metrics.get("dominant_issue")) if metrics.get("dominant_issue") else None)
+
+    _add_feedback_entry(entries, "total_issues", score=_safe_number(metrics.get("total_issues")))
+    _add_feedback_entry(entries, "issue_density_per_1k", score=_safe_number(metrics.get("issue_density_per_1k")))
+    _add_feedback_entry(entries, "agent_disagreement", score=_safe_number(metrics.get("agent_disagreement")))
+    _add_feedback_entry(entries, "report_length", score=_safe_number(metrics.get("report_length")))
+    _add_feedback_entry(entries, "analysis_latency_ms", score=_safe_number(meta.get("analysis_latency_ms")))
+    if consistency_score is not None:
+        _add_feedback_entry(entries, "consistency_score", score=consistency_score)
+
+    issue_counts = metrics.get("issue_counts") or {}
+    for key, value in issue_counts.items():
+        if isinstance(value, int):
+            _add_feedback_entry(entries, f"issue_count_{key}", score=value)
+
+    for key, value in agent_latencies.items():
+        num = _safe_number(value)
+        if num is None:
+            continue
+        _add_feedback_entry(entries, f"latency_{key}_ms", score=num)
+
+    for key, payload in agent_metrics.items():
+        if key == "final" or not isinstance(payload, dict):
+            continue
+        score = _safe_number(payload.get("score"))
+        if score is not None:
+            comment = payload.get("reason") or payload.get("error")
+            _add_feedback_entry(entries, f"{key}_quality", score=score, comment=comment)
+        strengths = payload.get("strengths")
+        if strengths:
+            _add_feedback_entry(entries, f"agent_{key}_strengths", value=strengths)
+        weaknesses = payload.get("weaknesses")
+        if weaknesses:
+            _add_feedback_entry(entries, f"agent_{key}_weaknesses", value=weaknesses)
+        suggestion = payload.get("suggestion")
+        if suggestion:
+            _add_feedback_entry(entries, f"agent_{key}_suggestion", value=str(suggestion))
+
+    final_eval = agent_metrics.get("final") or {}
+    if isinstance(final_eval, dict):
+        for key in ["overall_quality", "dominant_risk", "issue_density", "persona_alignment"]:
+            value = final_eval.get(key)
+            if value:
+                _add_feedback_entry(entries, f"final_{key}", value=str(value))
+        agent_performance = final_eval.get("agent_performance")
+        if isinstance(agent_performance, dict):
+            for agent_key, agent_value in agent_performance.items():
+                if not isinstance(agent_value, dict):
+                    continue
+                quality = agent_value.get("quality")
+                if quality:
+                    _add_feedback_entry(entries, f"final_agent_{agent_key}_quality", value=str(quality))
+                signals = agent_value.get("signals")
+                if signals:
+                    _add_feedback_entry(entries, f"final_agent_{agent_key}_signals", value=signals)
+        notes = final_eval.get("notes")
+        if notes:
+            _add_feedback_entry(entries, "final_notes", value=notes)
+
+    return entries
+
+
+@traceable(name="eval_run", run_type="chain")
 async def evaluate_text(
     text: str | None = None,
     doc_id: str | None = None,
@@ -619,6 +752,16 @@ async def evaluate_text(
     scores.update(
         compute_quality_score(metrics, scores, agent_metrics, consistency_score)
     )
+    feedback_entries = _build_langsmith_feedback(
+        metrics=metrics,
+        scores=scores,
+        agent_metrics=agent_metrics,
+        meta=meta,
+        agent_latencies=agent_latencies,
+        consistency_score=consistency_score,
+    )
+    if feedback_entries:
+        create_feedback(feedback_entries)
 
     eval_run = EvalRun(
         id=os.urandom(16).hex(),
