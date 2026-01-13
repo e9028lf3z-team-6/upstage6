@@ -8,7 +8,7 @@ tone_agent = ToneEvaluatorAgent()
 @traceable_timed(name="tone")
 def tone_node(state: AgentState) -> AgentState:
     result = tone_agent.run(
-        split_text=str(state["split_text"])
+        split_text=str(state["original_text"])
     )
 
     return {
