@@ -1,5 +1,5 @@
 # app/graph/nodes/hate_bias_metric_node.py
-from app.agents.metrics.hate_bias_metric import HateBiasMetricAgent
+from app.agents.metrics.HateBias_metric import HateBiasMetricAgent
 from app.graph.state import AgentState
 
 hate_bias_metric_agent = HateBiasMetricAgent()
