@@ -2,7 +2,7 @@ import re
 from typing import Dict, List, Tuple
 
 
-_SENTENCE_PATTERN = re.compile(r".*?(?:[.!?]|\n|$)", re.S)
+_SENTENCE_PATTERN = re.compile(r".*?(?:[!?]|\.(?!\d)|\n|$)", re.S)
 
 
 def split_with_map(text: str) -> Tuple[List[str], List[Dict[str, int | str]]]:
@@ -20,6 +20,8 @@ def split_with_map(text: str) -> Tuple[List[str], List[Dict[str, int | str]]]:
         if doc_end <= doc_start:
             continue
         sentence = text[doc_start:doc_end]
+        if not re.search(r"[0-9A-Za-z\uAC00-\uD7A3]", sentence):
+            continue
         sentence_index = len(sentences)
         sentences.append(sentence)
         split_map.append(

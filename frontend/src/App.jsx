@@ -98,30 +98,43 @@ function renderHighlightedText(text, highlights, issueReasonMap) {
   if (!highlights || highlights.length === 0) return text
 
   const parts = []
-  let cursor = 0
-
-  highlights.forEach((h, idx) => {
-    const start = Math.max(cursor, h.start)
-    const end = h.end
-    if (start > cursor) {
-      parts.push(text.slice(cursor, start))
-    }
-    if (end > start) {
-      const color = AGENT_COLORS[h.agent] || 'rgba(255, 220, 120, 0.35)'
-      const key = `${h.start}:${h.end}:${h.agent || ''}`
-      const reason = issueReasonMap?.[key]
-      const title = reason || [h.agent, h.label, h.severity].filter(Boolean).join(' | ')
-      parts.push(
-        <span key={`${start}-${end}-${idx}`} style={{ backgroundColor: color }} title={title}>
-          {text.slice(start, end)}
-        </span>
-      )
-      cursor = end
-    }
+  const boundaries = new Set([0, text.length])
+  highlights.forEach((h) => {
+    boundaries.add(h.start)
+    boundaries.add(h.end)
   })
+  const points = Array.from(boundaries).sort((a, b) => a - b)
 
-  if (cursor < text.length) {
-    parts.push(text.slice(cursor))
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const start = points[i]
+    const end = points[i + 1]
+    if (end <= start) continue
+    const active = highlights.filter(h => h.start < end && h.end > start)
+    if (active.length === 0) {
+      parts.push(text.slice(start, end))
+      continue
+    }
+    const primary = active[0]
+    const agent = primary.agent
+    const color = (agent && AGENT_COLORS[agent]) || 'rgba(255, 220, 120, 0.35)'
+    const reasonParts = []
+    const metaParts = []
+    active.forEach((h) => {
+      if (h.reason) reasonParts.push(h.reason)
+      else {
+        const key = `${h.start}:${h.end}:${h.agent || ''}`
+        if (issueReasonMap?.[key]) reasonParts.push(issueReasonMap[key])
+      }
+      metaParts.push([h.agent, h.label, h.severity].filter(Boolean).join(' | '))
+    })
+    const reason = Array.from(new Set(reasonParts.filter(Boolean))).join(' | ')
+    const meta = Array.from(new Set(metaParts.filter(Boolean))).join(' | ')
+    const title = reason || meta
+    parts.push(
+      <span key={`${start}-${end}-${i}`} style={{ backgroundColor: color }} title={title}>
+        {text.slice(start, end)}
+      </span>
+    )
   }
 
   return parts
