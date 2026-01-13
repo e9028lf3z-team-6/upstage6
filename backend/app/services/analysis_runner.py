@@ -3,6 +3,8 @@ from typing import Any, Dict, Optional
 from app.core.settings import get_settings
 from app.services.pipeline_runner import run_full_pipeline
 
+async def run_analysis_for_text(text: str, mode: str = "full") -> Dict[str, Any]:
+    """Run the full multi-agent pipeline.
 
 async def run_analysis_for_text(
     text: str,
@@ -21,33 +23,48 @@ async def run_analysis_for_text(
     # Full LangGraph pipeline (preferred)
     # --------------------------------------------------
     if settings.upstage_api_key:
-        return run_full_pipeline(
-            text=text,
-            context=context,
-            expected=None,
-            debug=True,
-        )
+        return run_full_pipeline(text, debug=True, mode=mode)
 
-    # --------------------------------------------------
-    # Local fallback (LLM 없음, 스키마만 동일)
-    # --------------------------------------------------
-    tone = _heuristic_tone(text)
-    logic = _heuristic_causality(text)
-    trauma = _heuristic_trauma(text)
-    hate_bias = _heuristic_hate_bias(text)
-    genre_cliche = _heuristic_genre_cliche(text)
-    spelling = {"issues": []}
+    # Local fallback: run only split + lightweight heuristics (no LLM).
+    # This keeps the pipeline shape similar to the full output.
+    split = _split_text(text)
 
-    aggregated = {
-        "decision": "pass",
-        "has_issues": any([
-            tone["issues"],
-            logic["issues"],
-            trauma["issues"],
-            hate_bias["issues"],
-            genre_cliche["issues"],
-        ]),
-        "summary": "(Mock) UPSTAGE_API_KEY가 없어 로컬 휴리스틱으로 분석했습니다.",
+    # Initialize empty
+    tone = {}
+    causality = {}
+    tension = {}
+    trauma = {}
+    hate = {}
+    cliche = {}
+
+    # Run Causality (Always in fallback)
+    causality = _heuristic_causality(text)
+
+    if mode == "full":
+        tone = _heuristic_tone(text)
+        tension = _heuristic_tension(text)
+        trauma = _heuristic_trauma(text)
+        hate = _heuristic_hate_bias(text)
+        cliche = _heuristic_genre_cliche(text)
+
+    aggregate = {
+        "summary": "(Mock) UPSTAGE_API_KEY가 없어 로컬 휴리스틱으로 분석했습니다." + (" (로그인 필요)" if mode != "full" else ""),
+        "tone_issues": tone.get("issues", []),
+        "logic_issues": causality.get("issues", []),
+        "tension": tension,
+        "trauma_issues": trauma.get("issues", []),
+        "hate_issues": hate.get("issues", []),
+        "cliche_issues": cliche.get("issues", []),
+    }
+
+    final_metric = {
+        "reader_level": _guess_reader_level(text) if mode == "full" else "N/A",
+        "notes": "LLM 미사용: 결과는 데모용 휴리스틱입니다.",
+        "scores": {
+            "tone": tone.get("score", 0),
+            "causality": causality.get("score", 0),
+            "safety": max(trauma.get("score", 0), hate.get("score", 0)),
+        }
     }
 
     return {
@@ -66,21 +83,11 @@ async def run_analysis_for_text(
         "tone": tone,
         "logic": logic,
         "trauma": trauma,
-        "hate_bias": hate_bias,
-        "genre_cliche": genre_cliche,
-        "spelling": spelling,
-
-        # --------------------
-        # persona (fallback은 없음)
-        # --------------------
-        "reader_persona": None,
-        "persona_feedback": None,
-
-        # --------------------
-        # aggregate / rewrite
-        # --------------------
-        "aggregated": aggregated,
-        "rewrite_guidelines": None,
+        "hate_bias": hate,
+        "genre_cliche": cliche,
+        "aggregate": aggregate,
+        "final_metric": final_metric,
+        "debug": {"mode": f"local_fallback_{mode}"},
     }
 
 
