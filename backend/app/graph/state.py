@@ -21,6 +21,7 @@ class AgentState(TypedDict, total=False):
     hate_bias_result: Optional[Dict[str, Any]]
     genre_cliche_result: Optional[Dict[str, Any]]
     spelling_result: Optional[Dict[str, Any]]
+    tension_curve_result: Optional[Dict[str, Any]]
 
     # aggregate
     aggregated_result: Optional[Dict[str, Any]]
@@ -34,3 +35,7 @@ class AgentState(TypedDict, total=False):
     # rewrite / output
     rewrite_guidelines: Optional[Dict[str, Any]]
     final_report: Optional[Dict[str, Any]]
+
+    # evaluators
+    qa_scores: Optional[Dict[str, Any]]
+    final_metric: Optional[Dict[str, Any]]
