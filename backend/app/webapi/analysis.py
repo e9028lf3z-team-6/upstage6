@@ -1,11 +1,11 @@
-import json
-import uuid
-from fastapi import APIRouter, HTTPException
+import json, uuid
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import select
 from rq import Queue
 from redis import Redis
 
-from app.core.db import get_session, Document, Analysis
+from app.core.db import get_session, Document, Analysis, User
+from app.core.auth import get_current_user
 from app.services.analysis_runner import run_analysis_for_text
 from app.services.analysis_jobs import run_analysis_job, _collect_issue_counts, _is_fallback
 from app.core.settings import get_settings
@@ -14,16 +14,19 @@ from app.webapi.schemas import AnalysisOut, AnalysisDetail
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 @router.post("/run/{doc_id}", response_model=AnalysisOut)
-async def run_analysis(doc_id: str):
+async def run_analysis(
+    doc_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Determine analysis mode based on login status
+    mode = "full" if current_user else "causality_only"
+
     async with get_session() as session:
         d = await session.get(Document, doc_id)
         if not d:
             raise HTTPException(404, "Document not found")
 
-        result = await run_analysis_for_text(d.extracted_text, context=d.meta_json)
-        status = "fallback" if _is_fallback(result) else "done"
-        issue_counts = _collect_issue_counts(result)
-        has_issues = any(v > 0 for v in issue_counts.values())
+        result = await run_analysis_for_text(d.extracted_text, mode=mode)
 
         a = Analysis(
             id=str(uuid.uuid4()),
