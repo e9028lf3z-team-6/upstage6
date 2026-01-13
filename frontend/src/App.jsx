@@ -53,6 +53,80 @@ function makeTimestampName(prefix = 'note') {
   return `${prefix}_${y}${mo}${da}_${h}${mi}${s}.txt`
 }
 
+const AGENT_COLORS = {
+  logic: 'rgba(90, 150, 255, 0.35)',
+  causality: 'rgba(90, 150, 255, 0.35)',
+  tone: 'rgba(180, 120, 255, 0.35)',
+  trauma: 'rgba(255, 90, 90, 0.35)',
+  hate_bias: 'rgba(200, 60, 60, 0.35)',
+  genre_cliche: 'rgba(255, 170, 70, 0.35)',
+  spelling: 'rgba(110, 200, 120, 0.35)',
+  tension: 'rgba(80, 200, 200, 0.35)'
+}
+
+function normalizeHighlights(highlights, textLength) {
+  if (!Array.isArray(highlights)) return []
+  const safe = []
+  highlights.forEach((item) => {
+    if (!item || typeof item.doc_start !== 'number' || typeof item.doc_end !== 'number') return
+    const start = Math.max(0, Math.min(item.doc_start, textLength))
+    const end = Math.max(0, Math.min(item.doc_end, textLength))
+    if (end <= start) return
+    safe.push({ ...item, start, end })
+  })
+  return safe.sort((a, b) => (a.start - b.start) || (a.end - b.end))
+}
+
+function buildIssueReasonMap(normalizedIssues) {
+  if (!Array.isArray(normalizedIssues)) return {}
+  const map = {}
+  normalizedIssues.forEach((issue) => {
+    const location = issue?.location || {}
+    const start = location.doc_start
+    const end = location.doc_end
+    if (typeof start !== 'number' || typeof end !== 'number') return
+    const key = `${start}:${end}:${issue.agent || ''}`
+    if (!map[key]) {
+      map[key] = issue.reason || issue.issue_type || ''
+    }
+  })
+  return map
+}
+
+function renderHighlightedText(text, highlights, issueReasonMap) {
+  if (!text) return ''
+  if (!highlights || highlights.length === 0) return text
+
+  const parts = []
+  let cursor = 0
+
+  highlights.forEach((h, idx) => {
+    const start = Math.max(cursor, h.start)
+    const end = h.end
+    if (start > cursor) {
+      parts.push(text.slice(cursor, start))
+    }
+    if (end > start) {
+      const color = AGENT_COLORS[h.agent] || 'rgba(255, 220, 120, 0.35)'
+      const key = `${h.start}:${h.end}:${h.agent || ''}`
+      const reason = issueReasonMap?.[key]
+      const title = reason || [h.agent, h.label, h.severity].filter(Boolean).join(' | ')
+      parts.push(
+        <span key={`${start}-${end}-${idx}`} style={{ backgroundColor: color }} title={title}>
+          {text.slice(start, end)}
+        </span>
+      )
+      cursor = end
+    }
+  })
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor))
+  }
+
+  return parts
+}
+
 export default function App() {
   // Auth
   const [user, setUser] = useState(null)
@@ -344,6 +418,14 @@ export default function App() {
   const reportMarkdown = activeAnalysis?.result?.report?.full_report_markdown
   const qaScores = activeAnalysis?.result?.qa_scores
   const canShowJson = !!activeAnalysis
+  const rawHighlights = activeAnalysis?.result?.highlights
+  const normalizedIssues = activeAnalysis?.result?.normalized_issues
+  const issueReasonMap = buildIssueReasonMap(normalizedIssues)
+  const highlightFilter = user ? null : new Set(['logic', 'causality'])
+  const filteredHighlights = normalizeHighlights(
+    (rawHighlights || []).filter(h => !highlightFilter || highlightFilter.has(h.agent)),
+    (activeDoc?.extracted_text || '').length
+  )
 
   // -----------------------------
   // Upload panel handlers
@@ -706,7 +788,7 @@ export default function App() {
         <div style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
           {activeDoc ? (
             <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
-              {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
+              {renderHighlightedText(activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)', filteredHighlights, issueReasonMap)}
             </pre>
           ) : (
             <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
