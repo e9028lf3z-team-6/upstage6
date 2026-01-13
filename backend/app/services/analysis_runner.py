@@ -16,6 +16,8 @@ from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
 from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
 from app.observability.langsmith import traceable
 from app.llm.client import has_upstage_api_key
+from app.services.split_map import build_split_payload
+from app.services.issue_normalizer import normalize_issues
 
 
 @traceable(name="analysis_run", run_type="chain")
@@ -54,8 +56,12 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
     logic = final_state.get("logic_result") or final_state.get("causality_result")
     tension = final_state.get("tension_curve_result")
 
+    split_payload = final_state.get("split_text") or {}
+    if not isinstance(split_payload, dict):
+        split_payload = {"split_text": split_payload}
+
     result = {
-        "split": final_state.get("split_text"),
+        "split": split_payload,
         "final_report": final_report,
         "report": final_report,
         "decision": decision,
@@ -77,6 +83,11 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
 
     result["final_metric"] = final_state.get("final_metric") or _run_final_evaluator(result)
     result["qa_scores"] = final_state.get("qa_scores") or _run_qa_scores(text, result, mode="full")
+    normalized_issues, highlights = normalize_issues(result, split_payload)
+    result["normalized_issues"] = normalized_issues
+    result["highlights"] = highlights
+    result["split_sentences"] = split_payload.get("split_sentences")
+    result["split_map"] = split_payload.get("split_map")
 
     return result
 
@@ -89,12 +100,12 @@ def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
     try:
         split_result = split_agent.run(text)
     except Exception:
-        split_result = {"split_text": [text]}
+        split_result = build_split_payload(text)
 
     causality = {}
     try:
         causality = causality_agent.run(
-            split_text=split_result.get("split_text", []),
+            split_result,
             reader_context=None,
         )
     except Exception:
@@ -137,6 +148,11 @@ def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
         "qa_scores": _run_qa_scores(text, {"causality": causality}, mode="causality_only"),
         "debug": {"mode": f"langgraph_{mode}"},
     }
+    normalized_issues, highlights = normalize_issues(result, split_result)
+    result["normalized_issues"] = normalized_issues
+    result["highlights"] = highlights
+    result["split_sentences"] = split_result.get("split_sentences")
+    result["split_map"] = split_result.get("split_map")
     return result
 
 
@@ -186,7 +202,7 @@ def _run_fallback(text: str, mode: str) -> Dict[str, Any]:
         "note": "LLM 미사용: 결과는 데모용 휴리스틱입니다.",
     }
 
-    return {
+    result = {
         "split": split,
         "tone": tone,
         "logic": causality,
@@ -202,6 +218,12 @@ def _run_fallback(text: str, mode: str) -> Dict[str, Any]:
         "decision": None,
         "debug": {"mode": f"local_fallback_{mode}"},
     }
+    normalized_issues, highlights = normalize_issues(result, split)
+    result["normalized_issues"] = normalized_issues
+    result["highlights"] = highlights
+    result["split_sentences"] = split.get("split_sentences")
+    result["split_map"] = split.get("split_map")
+    return result
 
 
 def _run_final_evaluator(outputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -248,7 +270,8 @@ def _split_text(text: str) -> dict:
     chunks = [c.strip() for c in text.split("\n\n") if c.strip()]
     if not chunks:
         chunks = [text.strip()]
-    return {"split_text": chunks, "num_chunks": len(chunks)}
+    summary = "\n\n".join(chunks[:5])
+    return build_split_payload(text, summary=summary)
 
 
 def _heuristic_tone(text: str) -> dict:
