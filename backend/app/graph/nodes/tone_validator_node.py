@@ -1,6 +1,6 @@
 # app/graph/nodes/tone_validator_node.py
 from app.graph.state import AgentState
-from app.agents.metrics.tone_output_validator import ToneOutputValidator
+from app.agents.metrics.tone_Metric import ToneOutputValidator
 
 tone_validator = ToneOutputValidator()
 

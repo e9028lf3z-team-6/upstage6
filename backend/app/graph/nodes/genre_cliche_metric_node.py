@@ -1,5 +1,5 @@
 # app/graph/nodes/genre_cliche_metric_node.py
-from app.agents.metrics.genre_cliche_metric import GenreClicheMetricAgent
+from app.agents.metrics.GenerCliche_metric import GenreClicheMetricAgent
 from app.graph.state import AgentState
 
 genre_cliche_metric_agent = GenreClicheMetricAgent()
