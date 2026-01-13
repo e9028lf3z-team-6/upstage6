@@ -4,6 +4,7 @@ from app.agents.tools.split_agent import SplitAgent
 from app.agents.tools.tone_agent import ToneEvaluatorAgent
 from app.agents.tools.causality_agent import CausalityEvaluatorAgent
 from app.agents.tools.TensionCurve_agent import TensionCurveAgent
+from app.agents.tools.Spelling_Agent import SpellingAgent
 
 from app.agents.tools.Trauma_agent import TraumaAgent
 from app.agents.tools.HateBias_agent import HateBiasAgent
@@ -25,6 +26,7 @@ from app.agents.evaluators.tension_evaluator import TensionQualityAgent
 from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
 from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
 from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
+from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
 
 
 # ---- singleton instances (서비스와 동일)
@@ -32,6 +34,7 @@ split_agent = SplitAgent()
 tone_agent = ToneEvaluatorAgent()
 causality_agent = CausalityEvaluatorAgent()
 tension_agent = TensionCurveAgent()
+spelling_agent = SpellingAgent()
 
 trauma_agent = TraumaAgent()
 hate_bias_agent = HateBiasAgent()
@@ -52,6 +55,7 @@ tension_quality_agent = TensionQualityAgent()
 trauma_quality_agent = TraumaQualityAgent()
 hatebias_quality_agent = HateBiasQualityAgent()
 cliche_quality_agent = GenreClicheQualityAgent()
+spelling_quality_agent = SpellingQualityAgent()
 
 
 def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
@@ -101,6 +105,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     trauma = {"issues": []}
     hate = {"issues": []}
     cliche = {"issues": []}
+    spelling = {"issues": []}
 
     # Run Causality (Always)
     causality = safe_run(causality_agent, split_text=split_result.get("split_text", []), reader_context=reader_context)
@@ -111,6 +116,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
         trauma = safe_run(trauma_agent, split_result.get("split_text", []))
         hate = safe_run(hate_bias_agent, split_result.get("split_text", []))
         cliche = safe_run(genre_cliche_agent, split_result.get("split_text", []))
+        spelling = safe_run(spelling_agent, split_result.get("split_text", []))
 
     # 5. aggregate
     aggregate = None
@@ -122,6 +128,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
                 trauma_issues=trauma.get("issues", []),
                 hate_issues=hate.get("issues", []),
                 cliche_issues=cliche.get("issues", []),
+                spelling_issues=spelling.get("issues", []),
                 persona_feedback=(
                     persona_feedback.get("persona_feedback")
                     if persona_feedback else None
@@ -187,6 +194,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
             qa_scores["trauma"] = trauma_quality_agent.run(text, trauma).get("score", 0)
             qa_scores["hate_bias"] = hatebias_quality_agent.run(text, hate).get("score", 0)
             qa_scores["cliche"] = cliche_quality_agent.run(text, cliche).get("score", 0)
+            qa_scores["spelling"] = spelling_quality_agent.run(text, spelling).get("score", 0)
         
         # Causality is always run
         qa_scores["causality"] = causality_quality_agent.run(text, causality).get("score", 0)
@@ -202,6 +210,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
         "trauma": trauma,
         "hate_bias": hate,
         "genre_cliche": cliche,
+        "spelling": spelling,
         "aggregate": aggregate.dict() if hasattr(aggregate, 'dict') else aggregate,
         "final_metric": final_metric,
         "report": report,
