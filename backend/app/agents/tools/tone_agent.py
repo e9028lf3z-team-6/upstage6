@@ -2,6 +2,7 @@ from app.agents.base import BaseAgent
 from app.llm.chat import chat
 import json
 import re
+from app.agents.utils import format_split_payload
 
 
 class ToneEvaluatorAgent(BaseAgent):
@@ -21,7 +22,7 @@ class ToneEvaluatorAgent(BaseAgent):
 
     name = "tone-evaluator"
 
-    def run(self, split_text: str) -> dict:
+    def run(self, split_payload: object) -> dict:
         system = """
         너는 JSON 출력 전용 엔진이다.
         반드시 유효한 JSON만 출력해야 한다.
@@ -29,8 +30,10 @@ class ToneEvaluatorAgent(BaseAgent):
         JSON 이외의 어떠한 문자열도 출력해서는 안 된다.
         """
 
+        split_context = format_split_payload(split_payload)
+
         prompt = f"""
-        다음은 원고의 말투를 구조적으로 정리한 텍스트이다.
+        다음은 원고의 말투를 구조적으로 정리한 텍스트와 문장 목록이다.
 
         너의 역할은 '말투 분석 에이전트'이다.
         단, 말투를 미학적으로 평가하지 않는다.
@@ -51,17 +54,26 @@ class ToneEvaluatorAgent(BaseAgent):
         {{
           "issues": [
             {{
-              "location": "말투 구조 상의 위치 또는 문단",
-              "problem": "개연성 관점의 문제 요약",
-              "evidence": "문제가 되는 말투 또는 설명",
-              "reader_impact": "독자가 느낄 수 있는 혼란 또는 어색함"
+              "issue_type": "tone_shift | tone_mismatch | register_mismatch",
+              "severity": "low | medium | high",
+              "sentence_index": 0,
+              "char_start": 0,
+              "char_end": 0,
+              "quote": "문제 구간 원문 인용",
+              "reason": "개연성 관점의 문제 요약",
+              "confidence": 0.0
             }}
           ],
           "note": "말투 전반에서 관찰된 독자 인지 흐름 특성 요약 (선택)"
         }}
 
-        말투 구조 텍스트:
-        {split_text}
+        규칙:
+        - sentence_index는 문장 목록 JSON 배열의 인덱스다.
+        - char_start/end는 해당 문장 내 0-based 위치다.
+        - quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
+        입력 텍스트:
+        {split_context}
         """
 
         response = chat(prompt, system=system)

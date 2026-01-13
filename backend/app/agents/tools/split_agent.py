@@ -1,6 +1,7 @@
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
 from app.llm.embedding import embed_text
+from app.services.split_map import build_split_payload
 
 """
 [SplitAgent]
@@ -59,7 +60,8 @@ class SplitAgent(BaseAgent):
         split_text = chat(split_prompt)
         embedding = embed_text(input_data)
 
-        return {
-            "split_text": split_text,
-            "embedding_dim": len(embedding),
-        }
+        return build_split_payload(
+            input_data,
+            summary=split_text,
+            embedding_dim=len(embedding),
+        )
