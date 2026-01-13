@@ -10,10 +10,22 @@ SessionLocal: async_sessionmaker[AsyncSession] | None = None
 class Base(DeclarativeBase):
     pass
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(255))
+    picture: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    documents: Mapped[list["Document"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
 class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))
     filename: Mapped[str] = mapped_column(String(255))
     content_type: Mapped[str] = mapped_column(String(120))
@@ -21,6 +33,7 @@ class Document(Base):
     extracted_text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    user: Mapped["User | None"] = relationship(back_populates="documents")
     analyses: Mapped[list["Analysis"]] = relationship(back_populates="document", cascade="all, delete-orphan")
 
 class Analysis(Base):

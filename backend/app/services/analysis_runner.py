@@ -6,7 +6,7 @@ from app.core.settings import get_settings
 # Reuse the existing pipeline from the provided agent implementation
 from app.services.pipeline_runner import run_full_pipeline
 
-async def run_analysis_for_text(text: str) -> Dict[str, Any]:
+async def run_analysis_for_text(text: str, mode: str = "full") -> Dict[str, Any]:
     """Run the full multi-agent pipeline.
 
     If UPSTAGE_API_KEY is missing, we still return a deterministic, local-only result
@@ -14,21 +14,32 @@ async def run_analysis_for_text(text: str) -> Dict[str, Any]:
     """
     settings = get_settings()
     if settings.upstage_api_key:
-        return run_full_pipeline(text, debug=True)
+        return run_full_pipeline(text, debug=True, mode=mode)
 
     # Local fallback: run only split + lightweight heuristics (no LLM).
     # This keeps the pipeline shape similar to the full output.
     split = _split_text(text)
 
-    tone = _heuristic_tone(text)
+    # Initialize empty
+    tone = {}
+    causality = {}
+    tension = {}
+    trauma = {}
+    hate = {}
+    cliche = {}
+
+    # Run Causality (Always in fallback)
     causality = _heuristic_causality(text)
-    tension = _heuristic_tension(text)
-    trauma = _heuristic_trauma(text)
-    hate = _heuristic_hate_bias(text)
-    cliche = _heuristic_genre_cliche(text)
+
+    if mode == "full":
+        tone = _heuristic_tone(text)
+        tension = _heuristic_tension(text)
+        trauma = _heuristic_trauma(text)
+        hate = _heuristic_hate_bias(text)
+        cliche = _heuristic_genre_cliche(text)
 
     aggregate = {
-        "summary": "(Mock) UPSTAGE_API_KEY가 없어 로컬 휴리스틱으로 분석했습니다.",
+        "summary": "(Mock) UPSTAGE_API_KEY가 없어 로컬 휴리스틱으로 분석했습니다." + (" (로그인 필요)" if mode != "full" else ""),
         "tone_issues": tone.get("issues", []),
         "logic_issues": causality.get("issues", []),
         "tension": tension,
@@ -38,7 +49,7 @@ async def run_analysis_for_text(text: str) -> Dict[str, Any]:
     }
 
     final_metric = {
-        "reader_level": _guess_reader_level(text),
+        "reader_level": _guess_reader_level(text) if mode == "full" else "N/A",
         "notes": "LLM 미사용: 결과는 데모용 휴리스틱입니다.",
         "scores": {
             "tone": tone.get("score", 0),
@@ -57,7 +68,7 @@ async def run_analysis_for_text(text: str) -> Dict[str, Any]:
         "genre_cliche": cliche,
         "aggregate": aggregate,
         "final_metric": final_metric,
-        "debug": {"mode": "local_fallback"},
+        "debug": {"mode": f"local_fallback_{mode}"},
     }
 
 def _split_text(text: str) -> dict:

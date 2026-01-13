@@ -1,51 +1,68 @@
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
 
-export async function listDocuments() {
-  const r = await fetch(`${API_BASE}/documents`);
-  if (!r.ok) throw new Error(await r.text());
+function getHeaders() {
+  const token = localStorage.getItem('token');
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function request(path, options = {}) {
+  const url = `${API_BASE}${path}`;
+  const headers = { ...getHeaders(), ...options.headers };
+  const r = await fetch(url, { ...options, headers });
+  if (!r.ok) {
+    if (r.status === 401) {
+      localStorage.removeItem('token');
+      // Optional: redirect to login or refresh page
+    }
+    throw new Error(await r.text());
+  }
   return r.json();
+}
+
+export async function listDocuments() {
+  return request('/documents');
 }
 
 export async function uploadDocument(file) {
   const fd = new FormData();
   fd.append('file', file);
-  const r = await fetch(`${API_BASE}/documents/upload`, { method:'POST', body: fd });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request('/documents/upload', { method:'POST', body: fd });
 }
 
 export async function getDocument(id) {
-  const r = await fetch(`${API_BASE}/documents/${id}`);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request(`/documents/${id}`);
 }
 
 export async function deleteDocument(id) {
-  const r = await fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE' });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request(`/documents/${id}`, { method: 'DELETE' });
 }
 
 export async function runAnalysis(docId) {
-  const r = await fetch(`${API_BASE}/analysis/run/${docId}`, { method:'POST' });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request(`/analysis/run/${docId}`, { method:'POST' });
 }
 
 export async function getAnalysis(id) {
-  const r = await fetch(`${API_BASE}/analysis/${id}`);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request(`/analysis/${id}`);
 }
 
 export async function deleteAnalysis(id) {
-  const r = await fetch(`${API_BASE}/analysis/${id}`, { method: 'DELETE' });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request(`/analysis/${id}`, { method: 'DELETE' });
 }
 
 export async function listAnalysesByDoc(docId) {
-  const r = await fetch(`${API_BASE}/analysis/by-document/${docId}`);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return request(`/analysis/by-document/${docId}`);
+}
+
+// Auth related
+export async function getMe() {
+  return request('/auth/me');
+}
+
+export function logout() {
+  localStorage.removeItem('token');
+  window.location.href = '/';
 }
