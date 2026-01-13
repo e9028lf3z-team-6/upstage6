@@ -9,6 +9,8 @@ class AgentState(TypedDict, total=False):
 
     # preprocessing
     split_text: Optional[Union[List[str], Dict[str, Any], str]]
+    split_sentences: Optional[List[str]]
+    split_map: Optional[List[Dict[str, Any]]]
 
     # persona
     reader_persona: Optional[Dict[str, Any]]

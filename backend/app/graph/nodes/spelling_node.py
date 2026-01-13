@@ -7,16 +7,7 @@ spelling_agent = SpellingAgent()
 
 @traceable_timed(name="spelling")
 def spelling_node(state: AgentState) -> AgentState:
-    split_text = state.get("split_text")
-
-    # split_text 구조 방어
-    sentences = []
-    if isinstance(split_text, dict):
-        sentences = split_text.get("split_text", [])
-    elif isinstance(split_text, list):
-        sentences = split_text
-
-    result = spelling_agent.run(sentences)
+    result = spelling_agent.run(state.get("split_text"))
 
     return {
         "spelling_result": result
