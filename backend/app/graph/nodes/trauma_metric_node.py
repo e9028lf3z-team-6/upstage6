@@ -1,6 +1,6 @@
 # app/graph/nodes/trauma_metric_node.py
 from app.graph.state import AgentState
-from app.agents.metrics.trauma_metric import TraumaMetric
+from app.agents.metrics.Trauma_metric import TraumaMetric
 
 trauma_metric = TraumaMetric()
 
