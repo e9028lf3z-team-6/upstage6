@@ -70,7 +70,7 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState(null)
 
-  // ✅ 업로드 화면 토글 (내부 저장소)
+  //  업로드 화면 토글 (내부 저장소)
   const [showUploader, setShowUploader] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -174,7 +174,7 @@ export default function App() {
   }, [isAnalyzing])
 
   // -----------------------------
-  // ✅ 공통 업로드 함수 (input/drag&drop 공용)
+  //  공통 업로드 함수 (input/drag&drop 공용)
   // -----------------------------
   async function uploadOneFile(file) {
     if (!file) return
@@ -480,7 +480,7 @@ export default function App() {
             <div className="muted" style={{fontSize:12}}>PDF/DOCX/HWP 업로드</div>
           </div>
 
-          {/* ✅ 업로드 버튼: 클릭하면 내부 저장소 업로드 화면으로 전환 */}
+          {/* 업로드 버튼: 클릭하면 내부 저장소 업로드 화면으로 전환 */}
           <button
             className="btn"
             onClick={openUploadPanel}
