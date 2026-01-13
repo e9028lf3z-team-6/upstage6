@@ -1,6 +1,7 @@
 import json
 import os
 import hashlib
+import math
 import statistics
 import time
 from typing import Any, Dict, Tuple
@@ -576,7 +577,15 @@ def _add_feedback_entry(
         return
     entry: dict[str, Any] = {"key": key}
     if score is not None:
-        entry["score"] = float(score)
+        try:
+            score_val = float(score)
+        except (TypeError, ValueError):
+            score_val = None
+        if score_val is not None and math.isfinite(score_val):
+            if abs(score_val) <= 99999.9999:
+                entry["score"] = score_val
+            elif value is None:
+                value = score_val
     if value is not None:
         entry["value"] = value
     if comment:

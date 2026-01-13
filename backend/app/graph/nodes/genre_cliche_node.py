@@ -8,7 +8,7 @@ genre_cliche_agent = GenreClicheAgent()
 @traceable_timed(name="genre_cliche")
 def genre_cliche_node(state: AgentState) -> AgentState:
     result = genre_cliche_agent.run(
-        split_text=state["split_text"]
+        state.get("split_text")
     )
 
     return {

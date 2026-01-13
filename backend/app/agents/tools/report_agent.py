@@ -33,17 +33,16 @@ class ComprehensiveReportAgent(BaseAgent):
         cliche_issues: List[dict],
         persona_feedback: dict | None = None,
     ) -> Dict:
-        
         # 텍스트 일부만 발췌해서 문맥 제공 (전체 텍스트는 너무 길 수 있음)
         # split_text의 앞부분 요약이나 일부만 사용
         text_preview = ""
-        if isinstance(split_text, dict) and "split_text" in split_text:
-             # split_text가 리스트라면 앞부분 5개 정도만
-            raw_splits = split_text["split_text"]
-            if isinstance(raw_splits, list):
-                text_preview = "\n".join(raw_splits[:5])
-            else:
-                text_preview = str(raw_splits)[:1000]
+        if isinstance(split_text, dict):
+            raw_summary = split_text.get("summary") or split_text.get("split_text")
+            raw_sentences = split_text.get("sentences") or split_text.get("split_sentences")
+            if isinstance(raw_sentences, list) and raw_sentences:
+                text_preview = "\n".join(raw_sentences[:5])
+            elif raw_summary:
+                text_preview = str(raw_summary)[:1000]
 
         system = """
         당신은 냉철하지만 건설적인 조언을 주는 '수석 편집자(Chief Editor)'입니다.
@@ -77,15 +76,17 @@ class ComprehensiveReportAgent(BaseAgent):
         당신은 아래의 구조와 원칙에 따라 마크다운(Markdown) 형식의 리포트를 작성해야 합니다.
         
         # [1. 종합 진단 요약]
-        - **최종 판정**: (예: 🚨 재작성 권고 / ⚠️ 부분 수정 필요 / ✅ 승인)
+        - **최종 판정**: (예: ?? 재작성 권고 / ?? 부분 수정 필요 / ? 승인)
         - **한 줄 요약**: 전체 피드백을 관통하는 가장 중요한 핵심 문장.
 
         # [2. 에이전트별 상세 피드백]
-        - **🧐 서사/장르 분석관**: 글의 구조, 장르적 특징, 클리셰 활용도 요약. (Cliche 이슈 참고)
-        - **🗣️ 말투/표현 감사관**: 언어적 습관, 어색한 문장, 톤앤매너 일치 여부 요약. (Tone 이슈 참고)
-        - **🔗 인과/논리 검증관**: 설정 오류, 개연성 부족, 사건의 연결성 문제 요약. (Logic/Causality 이슈 참고)
-        - **🛡️ 윤리/안전 관리자**: 트라우마, 혐오 표현 등 세이프티 체크 결과 요약. (Hate/Trauma 이슈 참고)
-        - **👤 가상 독자(페르소나) 반응**: 설정된 페르소나가 느낀 구체적인 혼란이나 질문 요약.
+        - 각 이슈는 가능한 한 issue의 quote를 그대로 인용하고 sentence_index를 함께 표기하세요.
+        - 근거 인용은 목록 형태로 정리하고, 중요도 순서로 배열하세요.
+        - **?? 서사/장르 분석관**: 글의 구조, 장르적 특징, 클리셰 활용도 요약. (Cliche 이슈 참고)
+        - **??? 말투/표현 감사관**: 언어적 습관, 어색한 문장, 톤앤매너 일치 여부 요약. (Tone 이슈 참고)
+        - **?? 인과/논리 검증관**: 설정 오류, 개연성 부족, 사건의 연결성 문제 요약. (Logic/Causality 이슈 참고)
+        - **??? 윤리/안전 관리자**: 트라우마, 혐오 표현 등 세이프티 체크 결과 요약. (Hate/Trauma 이슈 참고)
+        - **?? 가상 독자(페르소나) 반응**: 설정된 페르소나가 느낀 구체적인 혼란이나 질문 요약.
 
         # [3. 최종 메트릭 및 개선 우선순위]
         - **핵심 리스크**: 가장 먼저 해결해야 할 문제 1-2가지.
@@ -93,10 +94,10 @@ class ComprehensiveReportAgent(BaseAgent):
         """
 
         response = chat(prompt, system=system)
-        
+
         # JSON 파싱 없이 마크다운 텍스트를 그대로 반환
         return {
             "report_title": "종합 분석 리포트",
             "summary": "종합 리포트를 확인하세요.",  # 요약은 마크다운 안에 포함됨
-            "full_report_markdown": response
+            "full_report_markdown": response,
         }

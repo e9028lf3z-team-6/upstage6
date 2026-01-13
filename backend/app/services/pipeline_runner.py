@@ -27,6 +27,8 @@ from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
 from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
 from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
 from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
+from app.services.issue_normalizer import normalize_issues
+from app.services.split_map import build_split_payload
 
 
 # ---- singleton instances (서비스와 동일)
@@ -59,13 +61,20 @@ spelling_quality_agent = SpellingQualityAgent()
 
 
 def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
+    def _fallback_split_payload(source_text: str) -> dict:
+        chunks = [chunk.strip() for chunk in source_text.split("\n\n") if chunk.strip()]
+        summary = "\n\n".join(chunks[:5]) if chunks else source_text.strip()
+        return build_split_payload(source_text, summary=summary)
+
     # 1. split
     try:
         split_result = split_agent.run(text)
+        if not isinstance(split_result, dict):
+            split_result = _fallback_split_payload(str(split_result))
     except Exception as e:
         print(f"Split agent failed: {e}")
         # fallback
-        split_result = {"split_text": [text]}
+        split_result = _fallback_split_payload(text)
 
     # 2. persona (Needed for causality too)
     persona = None
@@ -74,6 +83,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
         persona = persona_agent.run({
             "text": text,
             "split_text": split_result.get("split_text", []),
+            "split_sentences": split_result.get("split_sentences", []),
         })
         reader_context = persona.get("persona")
     except Exception:
@@ -85,7 +95,7 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
         try:
             persona_feedback = persona_feedback_agent.run(
                 persona=persona,
-                split_text=split_result.get("split_text", []),
+                split_payload=split_result,
             )
         except Exception:
             pass
@@ -108,15 +118,15 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     spelling = {"issues": []}
 
     # Run Causality (Always)
-    causality = safe_run(causality_agent, split_text=split_result.get("split_text", []), reader_context=reader_context)
+    causality = safe_run(causality_agent, split_result, reader_context=reader_context)
 
     if mode == "full":
-        tone = safe_run(tone_agent, split_result.get("split_text", []))
-        tension = safe_run(tension_agent, split_result.get("split_text", []))
-        trauma = safe_run(trauma_agent, split_result.get("split_text", []))
-        hate = safe_run(hate_bias_agent, split_result.get("split_text", []))
-        cliche = safe_run(genre_cliche_agent, split_result.get("split_text", []))
-        spelling = safe_run(spelling_agent, split_result.get("split_text", []))
+        tone = safe_run(tone_agent, split_result)
+        tension = safe_run(tension_agent, split_result)
+        trauma = safe_run(trauma_agent, split_result)
+        hate = safe_run(hate_bias_agent, split_result)
+        cliche = safe_run(genre_cliche_agent, split_result)
+        spelling = safe_run(spelling_agent, split_result)
 
     # 5. aggregate
     aggregate = None
@@ -216,6 +226,11 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
         "report": report,
         "qa_scores": qa_scores,
     }
+    normalized_issues, highlights = normalize_issues(result, split_result)
+    result["normalized_issues"] = normalized_issues
+    result["highlights"] = highlights
+    result["split_sentences"] = split_result.get("split_sentences")
+    result["split_map"] = split_result.get("split_map")
 
     if debug:
         result["debug"] = {
