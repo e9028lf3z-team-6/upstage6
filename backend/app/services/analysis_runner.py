@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 from app.core.settings import get_settings
 from app.graph.graph import agent_app
 from app.graph.state import AgentState
-from app.agents.tools.split_agent import SplitAgent
 from app.agents.tools.causality_agent import CausalityEvaluatorAgent
 from app.agents.tools.llm_aggregator import IssueBasedAggregatorAgent
 from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
@@ -80,19 +79,16 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
 
 
 def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
-    split_agent = SplitAgent()
     causality_agent = CausalityEvaluatorAgent()
     aggregator = IssueBasedAggregatorAgent()
 
-    try:
-        split_result = split_agent.run(text)
-    except Exception:
-        split_result = {"split_text": [text]}
+    # SplitAgent removed, passing raw text
+    split_result = {"split_text": text}
 
     causality = {}
     try:
         causality = causality_agent.run(
-            split_text=split_result.get("split_text", []),
+            split_text=split_result.get("split_text", ""),
             reader_context=None,
         )
     except Exception:
