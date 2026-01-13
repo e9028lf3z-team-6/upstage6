@@ -138,11 +138,11 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
         # Mock aggregate for partial run
         aggregate = {"summary": "로그인 후 전체 분석 결과를 확인할 수 있습니다. (개연성 분석만 수행됨)"}
 
-    # 6. final metric
+    # 6. final evaluator
     final_metric = {}
     if mode == "full":
         try:
-            final_metric = final_metric_agent.run(
+            final_metric = final_evaluator_agent.run(
                 aggregate=aggregate.dict() if hasattr(aggregate, 'dict') else aggregate,
                 tone_issues=tone.get("issues", []),
                 logic_issues=causality.get("issues", []),

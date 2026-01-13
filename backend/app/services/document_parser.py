@@ -38,6 +38,8 @@ class DocumentParser:
 
         settings = get_settings()
 
+        upstage_error = None
+
         # ------------------------------
         # 1) Upstage Document Parse
         # ------------------------------
@@ -53,8 +55,6 @@ class DocumentParser:
                     }
             except Exception as e:
                 upstage_error = str(e)
-        else:
-            upstage_error = None
 
         # ------------------------------
         # 2) Local fallback

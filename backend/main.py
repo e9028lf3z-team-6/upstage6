@@ -15,6 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    allow_origins = [settings.frontend_origin] if settings.frontend_origin else ["*"]
     app = FastAPI(title="CONTEXTOR (TEAM) API", version="0.1.0")
     
     app.add_middleware(
@@ -34,6 +35,10 @@ def create_app() -> FastAPI:
     # Routers
     # -------------------------
     app.include_router(api_router, prefix="/api")
+
+    @app.on_event("startup")
+    async def _startup() -> None:
+        await init_db()
 
     logger = logging.getLogger("app.request")
 

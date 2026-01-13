@@ -26,7 +26,14 @@ async def run_analysis(
         if not d:
             raise HTTPException(404, "Document not found")
 
-        result = await run_analysis_for_text(d.extracted_text, mode=mode)
+        result = await run_analysis_for_text(
+            d.extracted_text,
+            context=d.meta_json,
+            mode=mode,
+        )
+        issue_counts = _collect_issue_counts(result)
+        has_issues = any(v > 0 for v in issue_counts.values())
+        status = "fallback" if _is_fallback(result) else "done"
 
         a = Analysis(
             id=str(uuid.uuid4()),
