@@ -6,12 +6,19 @@ from app.webapi.routes import router as api_router
 from app.core.settings import get_settings
 from app.core.db import init_db
 from dotenv import load_dotenv
+from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
 
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="CONTEXTOR (TEAM) API", version="0.1.0")
+    
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.secret_key
+    )
+    
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],

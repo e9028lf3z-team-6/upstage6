@@ -54,7 +54,7 @@ hatebias_quality_agent = HateBiasQualityAgent()
 cliche_quality_agent = GenreClicheQualityAgent()
 
 
-def run_full_pipeline(text: str, *, debug: bool = False):
+def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     # 1. split
     try:
         split_result = split_agent.run(text)
@@ -63,7 +63,7 @@ def run_full_pipeline(text: str, *, debug: bool = False):
         # fallback
         split_result = {"split_text": [text]}
 
-    # 2. persona
+    # 2. persona (Needed for causality too)
     persona = None
     reader_context = None
     try:
@@ -77,7 +77,7 @@ def run_full_pipeline(text: str, *, debug: bool = False):
 
     # 3. persona feedback
     persona_feedback = None
-    if persona:
+    if mode == "full" and persona:
         try:
             persona_feedback = persona_feedback_agent.run(
                 persona=persona,
@@ -94,78 +94,104 @@ def run_full_pipeline(text: str, *, debug: bool = False):
             print(f"Agent {agent.name} failed: {e}")
             return {"issues": [], "error": str(e)}
 
-    tone = safe_run(tone_agent, split_result.get("split_text", []))
+    # Initialize empty results
+    tone = {"issues": []}
+    causality = {"issues": []}
+    tension = {"curve": []}
+    trauma = {"issues": []}
+    hate = {"issues": []}
+    cliche = {"issues": []}
+
+    # Run Causality (Always)
     causality = safe_run(causality_agent, split_text=split_result.get("split_text", []), reader_context=reader_context)
-    tension = safe_run(tension_agent, split_result.get("split_text", []))
-    trauma = safe_run(trauma_agent, split_result.get("split_text", []))
-    hate = safe_run(hate_bias_agent, split_result.get("split_text", []))
-    cliche = safe_run(genre_cliche_agent, split_result.get("split_text", []))
+
+    if mode == "full":
+        tone = safe_run(tone_agent, split_result.get("split_text", []))
+        tension = safe_run(tension_agent, split_result.get("split_text", []))
+        trauma = safe_run(trauma_agent, split_result.get("split_text", []))
+        hate = safe_run(hate_bias_agent, split_result.get("split_text", []))
+        cliche = safe_run(genre_cliche_agent, split_result.get("split_text", []))
 
     # 5. aggregate
-    try:
-        aggregate = aggregator.run(
-            tone_issues=tone.get("issues", []),
-            logic_issues=causality.get("issues", []),
-            trauma_issues=trauma.get("issues", []),
-            hate_issues=hate.get("issues", []),
-            cliche_issues=cliche.get("issues", []),
-            persona_feedback=(
-                persona_feedback.get("persona_feedback")
-                if persona_feedback else None
-            ),
-            reader_context=reader_context,
-        )
-    except Exception as e:
-        # Fallback aggregate result
-        from app.agents.tools.llm_aggregator import AggregateResult
-        aggregate = AggregateResult(
-            decision="pass", problem_types=[], primary_issue=None, rationale={"error": str(e)}
-        )
+    aggregate = None
+    if mode == "full":
+        try:
+            aggregate = aggregator.run(
+                tone_issues=tone.get("issues", []),
+                logic_issues=causality.get("issues", []),
+                trauma_issues=trauma.get("issues", []),
+                hate_issues=hate.get("issues", []),
+                cliche_issues=cliche.get("issues", []),
+                persona_feedback=(
+                    persona_feedback.get("persona_feedback")
+                    if persona_feedback else None
+                ),
+                reader_context=reader_context,
+            )
+        except Exception as e:
+            # Fallback aggregate result
+            from app.agents.tools.llm_aggregator import AggregateResult
+            aggregate = AggregateResult(
+                decision="pass", problem_types=[], primary_issue=None, rationale={"error": str(e)}
+            )
+    else:
+        # Mock aggregate for partial run
+        aggregate = {"summary": "로그인 후 전체 분석 결과를 확인할 수 있습니다. (개연성 분석만 수행됨)"}
 
     # 6. final metric
-    try:
-        final_metric = final_metric_agent.run(
-            aggregate=aggregate.dict(),
-            tone_issues=tone.get("issues", []),
-            logic_issues=causality.get("issues", []),
-            trauma_issues=trauma.get("issues", []),
-            hate_issues=hate.get("issues", []),
-            cliche_issues=cliche.get("issues", []),
-            persona_feedback=(
-                persona_feedback.get("persona_feedback")
-                if persona_feedback else None
-            ),
-        )
-    except Exception:
-        final_metric = {}
+    final_metric = {}
+    if mode == "full":
+        try:
+            final_metric = final_metric_agent.run(
+                aggregate=aggregate.dict() if hasattr(aggregate, 'dict') else aggregate,
+                tone_issues=tone.get("issues", []),
+                logic_issues=causality.get("issues", []),
+                trauma_issues=trauma.get("issues", []),
+                hate_issues=hate.get("issues", []),
+                cliche_issues=cliche.get("issues", []),
+                persona_feedback=(
+                    persona_feedback.get("persona_feedback")
+                    if persona_feedback else None
+                ),
+            )
+        except Exception:
+            final_metric = {}
 
     # 7. Comprehensive Report (NEW)
-    try:
-        report = report_agent.run(
-            split_text=split_result,
-            tone_issues=tone.get("issues", []),
-            logic_issues=causality.get("issues", []),
-            trauma_issues=trauma.get("issues", []),
-            hate_issues=hate.get("issues", []),
-            cliche_issues=cliche.get("issues", []),
-            persona_feedback=(
-                persona_feedback.get("persona_feedback")
-                if persona_feedback else None
-            ),
-        )
-    except Exception as e:
-        report = {"error": str(e), "full_report_markdown": "리포트 생성 중 오류가 발생했습니다."}
+    report = {}
+    if mode == "full":
+        try:
+            report = report_agent.run(
+                split_text=split_result,
+                tone_issues=tone.get("issues", []),
+                logic_issues=causality.get("issues", []),
+                trauma_issues=trauma.get("issues", []),
+                hate_issues=hate.get("issues", []),
+                cliche_issues=cliche.get("issues", []),
+                persona_feedback=(
+                    persona_feedback.get("persona_feedback")
+                    if persona_feedback else None
+                ),
+            )
+        except Exception as e:
+            report = {"error": str(e), "full_report_markdown": "리포트 생성 중 오류가 발생했습니다."}
+    else:
+        report = {"full_report_markdown": "# 개연성 분석 리포트\n\n로그인하지 않은 상태에서는 **개연성(Causality)** 분석 결과만 제공됩니다.\n\n## 분석 결과 요약\n" + str(causality.get("issues", []))}
 
 
     # 8. Evaluation Scores (QA)
     qa_scores = {}
     try:
-        qa_scores["tone"] = tone_quality_agent.run(text, tone).get("score", 0)
+        if mode == "full":
+            qa_scores["tone"] = tone_quality_agent.run(text, tone).get("score", 0)
+            qa_scores["tension"] = tension_quality_agent.run(text, tension).get("score", 0)
+            qa_scores["trauma"] = trauma_quality_agent.run(text, trauma).get("score", 0)
+            qa_scores["hate_bias"] = hatebias_quality_agent.run(text, hate).get("score", 0)
+            qa_scores["cliche"] = cliche_quality_agent.run(text, cliche).get("score", 0)
+        
+        # Causality is always run
         qa_scores["causality"] = causality_quality_agent.run(text, causality).get("score", 0)
-        qa_scores["tension"] = tension_quality_agent.run(text, tension).get("score", 0)
-        qa_scores["trauma"] = trauma_quality_agent.run(text, trauma).get("score", 0)
-        qa_scores["hate_bias"] = hatebias_quality_agent.run(text, hate).get("score", 0)
-        qa_scores["cliche"] = cliche_quality_agent.run(text, cliche).get("score", 0)
+
     except Exception as e:
         print(f"QA Evaluation failed: {e}")
 
@@ -177,7 +203,7 @@ def run_full_pipeline(text: str, *, debug: bool = False):
         "trauma": trauma,
         "hate_bias": hate,
         "genre_cliche": cliche,
-        "aggregate": aggregate.dict(),
+        "aggregate": aggregate.dict() if hasattr(aggregate, 'dict') else aggregate,
         "final_metric": final_metric,
         "report": report,  # Added report
         "qa_scores": qa_scores, # Added scores
@@ -188,6 +214,7 @@ def run_full_pipeline(text: str, *, debug: bool = False):
             "persona": persona,
             "persona_feedback": persona_feedback,
             "reader_context": reader_context,
+            "mode": mode
         }
 
     return result
