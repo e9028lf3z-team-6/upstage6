@@ -46,7 +46,6 @@ class Analysis(Base):
     decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
     has_issues: Mapped[bool | None] = mapped_column(nullable=True)
     issue_counts_json: Mapped[str] = mapped_column(Text, default="{}")
-    queue_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     result_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

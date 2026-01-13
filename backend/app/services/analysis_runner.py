@@ -13,6 +13,7 @@ from app.agents.evaluators.tension_evaluator import TensionQualityAgent
 from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
 from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
 from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
+from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
 from app.llm.client import has_upstage_api_key
 
 
@@ -49,7 +50,7 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
     decision = aggregated.get("decision")
     final_report = final_state.get("final_report")
     logic = final_state.get("logic_result") or final_state.get("causality_result")
-    tension = final_state.get("tension_result")
+    tension = final_state.get("tension_curve_result")
 
     result = {
         "split": final_state.get("split_text"),
@@ -72,8 +73,8 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
         "debug": {"mode": f"langgraph_{mode}"},
     }
 
-    result["final_metric"] = _run_final_evaluator(result)
-    result["qa_scores"] = _run_qa_scores(text, result, mode="full")
+    result["final_metric"] = final_state.get("final_metric") or _run_final_evaluator(result)
+    result["qa_scores"] = final_state.get("qa_scores") or _run_qa_scores(text, result, mode="full")
 
     return result
 
@@ -235,6 +236,7 @@ def _run_qa_scores(text: str, outputs: Dict[str, Any], mode: str) -> Dict[str, i
             scores["trauma"] = TraumaQualityAgent().run(text, outputs.get("trauma") or {}).get("score", 0)
             scores["hate_bias"] = HateBiasQualityAgent().run(text, outputs.get("hate_bias") or {}).get("score", 0)
             scores["cliche"] = GenreClicheQualityAgent().run(text, outputs.get("genre_cliche") or {}).get("score", 0)
+            scores["spelling"] = SpellingQualityAgent().run(text, outputs.get("spelling") or {}).get("score", 0)
     except Exception:
         return scores
     return scores

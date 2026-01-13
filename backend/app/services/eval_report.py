@@ -274,7 +274,7 @@ def render_eval_report(payload: dict) -> str:
     lines.append("")
 
     lines.append("[에이전트 성능 요약]")
-    for key in ["tone", "logic", "trauma", "hate_bias", "genre_cliche"]:
+    for key in ["tone", "logic", "trauma", "hate_bias", "genre_cliche", "spelling"]:
         value = agent_metrics.get(key) or {}
         if not value:
             continue
