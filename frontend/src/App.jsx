@@ -70,7 +70,7 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState(null)
 
-  // ✅ Left panel mode: 'list' | 'upload' | 'settings'
+  //  Left panel mode: 'list' | 'upload' | 'settings'
   const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -172,7 +172,7 @@ export default function App() {
   }, [isAnalyzing])
 
   // -----------------------------
-  // ✅ 공통 업로드 함수 (input/drag&drop 공용)
+  // 공통 업로드 함수 (input/drag&drop 공용)
   // -----------------------------
   async function uploadOneFile(file) {
     if (!file) return
@@ -386,7 +386,7 @@ export default function App() {
   }
 
   // -----------------------------
-  // ✅ Settings Button (bottom-right inside red box)
+  //  Settings Button (bottom-right inside red box)
   // -----------------------------
   function SettingsIcon() {
     return (
@@ -544,7 +544,7 @@ export default function App() {
           {isSavingDraft && <Badge>saving…</Badge>}
         </div>
 
-        {/* ✅ 파란 네모 영역 (스크롤 영역) */}
+        {/* (스크롤 영역) */}
         <div style={{marginTop:14, flex: 1, minHeight: 0, overflow:'auto', paddingBottom:12}}>
           {leftMode === 'upload' && (
             <div>
@@ -569,7 +569,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ✅ 되돌리기 버튼: 파란 네모 안 오른쪽 상단 */}
+                {/*  되돌리기 버튼 */}
                 <button
                   className="btn"
                   onClick={closeLeftPanelToList}
@@ -651,7 +651,7 @@ export default function App() {
 
           {leftMode === 'settings' && (
             <div>
-              {/* ✅ 설정 화면 (빈칸) + 되돌리기 버튼: 오른쪽 상단 */}
+              {/*  설정 화면 (빈칸) + 되돌리기 버튼: 오른쪽 상단 */}
               <div
                 className="card"
                 style={{
@@ -680,7 +680,7 @@ export default function App() {
                           height: 42,
 
                           display: 'flex',
-                          alignItems: 'center',      // 🔥 핵심
+                          alignItems: 'center',      //  핵심
                           justifyContent: 'center',}}
                   title="되돌리기"
                 >
