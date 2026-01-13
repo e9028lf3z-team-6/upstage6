@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     secret_key: str = "temporary_secret_key_for_development"
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
 
+    # Analysis feature flags (default enabled)
+    enable_split_map: bool = True
+    enable_normalized_issues: bool = True
+
 _settings: Settings | None = None
 
 def get_settings() -> Settings:

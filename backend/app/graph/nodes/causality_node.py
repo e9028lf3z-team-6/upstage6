@@ -23,3 +23,4 @@ def causality_node(state: AgentState) -> AgentState:
     return {
         "logic_result": result
     }
+
