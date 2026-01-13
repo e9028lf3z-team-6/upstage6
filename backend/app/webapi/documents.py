@@ -1,88 +1,85 @@
-import os, uuid
+import os
+import uuid
+import json
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
 
 from app.core.db import get_session, Document
-from app.services.document_parser import document_parser, SUPPORTED_EXT
-from app.webapi.schemas import DocumentOut, DocumentDetail
+from app.services.document_parser import document_parser
+from app.webapi.schemas import DocumentDetail, DocumentOut
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
 
 @router.get("", response_model=list[DocumentOut])
 async def list_documents():
     async with get_session() as session:
         res = await session.execute(select(Document).order_by(Document.created_at.desc()))
-        docs = res.scalars().all()
-        return [DocumentOut(
-            id=d.id, title=d.title, filename=d.filename, content_type=d.content_type, created_at=str(d.created_at)
-        ) for d in docs]
+        items = res.scalars().all()
+        return items
+
 
 @router.post("/upload", response_model=DocumentOut)
 async def upload_document(file: UploadFile = File(...)):
-    ext = Path(file.filename).suffix.lower()
-    if ext not in SUPPORTED_EXT:
-        raise HTTPException(400, f"Unsupported file type: {ext}. Use {sorted(SUPPORTED_EXT)}.")
+    if not file.filename:
+        raise HTTPException(400, "Filename is required")
 
     doc_id = str(uuid.uuid4())
-    safe_name = f"{doc_id}{ext}"
-    stored_path = Path("./data/uploads") / safe_name
+    ext = Path(file.filename).suffix.lower()
+    stored_name = f"{doc_id}{ext}"
+    stored_path = Path("data/uploads") / stored_name
+    stored_path.parent.mkdir(parents=True, exist_ok=True)
+
     content = await file.read()
-    stored_path.write_bytes(content)
+    with stored_path.open("wb") as f:
+        f.write(content)
 
-    try:
-        text, meta = await document_parser.extract_text(str(stored_path), file.content_type)
-    except Exception as e:
-        raise HTTPException(400, f"Failed to parse document: {e}")
+    text, meta = await document_parser.extract_text(str(stored_path))
+    title = Path(file.filename).stem or file.filename
+    content_type = file.content_type or "application/octet-stream"
 
-    title = Path(file.filename).stem
+    doc = Document(
+        id=doc_id,
+        title=title,
+        filename=file.filename,
+        content_type=content_type,
+        stored_path=str(stored_path),
+        extracted_text=text,
+        meta_json=json.dumps(meta, ensure_ascii=False),
+    )
 
     async with get_session() as session:
-        d = Document(
-            id=doc_id,
-            title=title,
-            filename=file.filename,
-            content_type=file.content_type or "application/octet-stream",
-            stored_path=str(stored_path),
-            extracted_text=text,
-        )
-        session.add(d)
+        session.add(doc)
         await session.commit()
+        await session.refresh(doc)
+        return doc
 
-    return DocumentOut(id=doc_id, title=title, filename=file.filename, content_type=d.content_type, created_at=str(d.created_at))
 
 @router.get("/{doc_id}", response_model=DocumentDetail)
 async def get_document(doc_id: str):
     async with get_session() as session:
-        d = await session.get(Document, doc_id)
-        if not d:
+        doc = await session.get(Document, doc_id)
+        if not doc:
             raise HTTPException(404, "Document not found")
-        return DocumentDetail(
-            id=d.id, title=d.title, filename=d.filename, content_type=d.content_type, created_at=str(d.created_at),
-            extracted_text=d.extracted_text
-        )
+        return doc
 
 
 @router.delete("/{doc_id}")
 async def delete_document(doc_id: str):
-    """Delete a document and all related analyses (cascade).
-
-    Also removes the uploaded file from ./data/uploads if it exists.
-    """
     async with get_session() as session:
-        d = await session.get(Document, doc_id)
-        if not d:
+        doc = await session.get(Document, doc_id)
+        if not doc:
             raise HTTPException(404, "Document not found")
-
-        # best-effort file cleanup
-        try:
-            if d.stored_path and os.path.exists(d.stored_path):
-                os.remove(d.stored_path)
-        except Exception:
-            # don't block DB delete on filesystem issues
-            pass
-
-        await session.delete(d)
+        stored_path = doc.stored_path
+        await session.delete(doc)
         await session.commit()
+
+    if stored_path and os.path.exists(stored_path):
+        try:
+            os.remove(stored_path)
+        except OSError:
+            pass
 
     return {"ok": True}
