@@ -1,5 +1,6 @@
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import format_split_payload
 
 
 class PersonaFeedbackAgent(BaseAgent):
@@ -12,12 +13,14 @@ class PersonaFeedbackAgent(BaseAgent):
 
     name = "persona-feedback"
 
-    def run(self, persona: dict, split_text: str) -> dict:
+    def run(self, persona: dict, split_payload: object) -> dict:
         system = """
 너는 JSON 출력 전용 엔진이다.
 반드시 유효한 JSON만 출력하라.
 JSON 외 텍스트 출력 금지.
 """
+
+        split_context = format_split_payload(split_payload)
 
         prompt = f"""
 다음은 독자 페르소나와 원고 분리 결과이다.
@@ -39,7 +42,7 @@ JSON 외 텍스트 출력 금지.
 {persona}
 
 분리 결과:
-{split_text}
+{split_context}
 
 출력 JSON 형식:
 {{
