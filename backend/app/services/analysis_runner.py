@@ -14,9 +14,11 @@ from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
 from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
 from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
 from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
+from app.observability.langsmith import traceable
 from app.llm.client import has_upstage_api_key
 
 
+@traceable(name="analysis_run", run_type="chain")
 async def run_analysis_for_text(
     text: str,
     context: Optional[str] = None,
