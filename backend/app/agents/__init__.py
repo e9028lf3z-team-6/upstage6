@@ -2,7 +2,7 @@
 """
 agents public API
 
-- agents/tools, agents/metrics 하위의 실제 Agent 클래스들을 자동 노출
+- agents/tools, agents/evaluators 하위의 실제 Agent 클래스들을 자동 노출
 - 외부에서는 `from app.agents import XXXAgent` 만 사용
 """
 
@@ -13,7 +13,7 @@ import inspect
 __all__ = []
 
 BASE_DIR = Path(__file__).parent
-SUB_PACKAGES = ["tools", "metrics"]
+SUB_PACKAGES = ["tools", "evaluators"]
 
 
 def _load_agents_from(package_name: str):
