@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     upstage_base_url: str = "https://api.upstage.ai/v1"
     upstage_document_parse_endpoint: str = "/document-ai/document-parse"
 
+    # LangSmith (Observability / Eval)
+    langsmith_api_key: str | None = None
+    langsmith_project: str | None = None
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_tracing: bool = False
+
     # Auth
     google_client_id: str | None = None
     google_client_secret: str | None = None

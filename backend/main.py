@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from dotenv import load_dotenv
 
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
+
 from app.webapi.routes import router as api_router
 from app.core.settings import get_settings
 from app.core.db import init_db
-from dotenv import load_dotenv
 from starlette.middleware.sessions import SessionMiddleware
 
 
