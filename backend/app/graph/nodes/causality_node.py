@@ -16,7 +16,7 @@ def causality_node(state: AgentState) -> AgentState:
         }
 
     result = causality_agent.run(
-        split_text=state["split_text"],
+        split_text=state["original_text"],
         reader_context=reader_context
     )
 
