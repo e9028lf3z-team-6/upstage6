@@ -11,6 +11,7 @@ function Badge({ children }) {
 }
 
 export default function App() {
+  const [user, setUser] = useState(null)
   const [docs, setDocs] = useState([])
   const [activeDocId, setActiveDocId] = useState(null)
   const [activeDoc, setActiveDoc] = useState(null)
@@ -20,6 +21,23 @@ export default function App() {
   const [error, setError] = useState(null)
   const fileRef = useRef(null)
 
+  // 1. Auth check and token parsing
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    if (token) {
+      localStorage.setItem('token', token)
+      window.history.replaceState({}, document.title, "/")
+    }
+
+    const savedToken = localStorage.getItem('token')
+    if (savedToken) {
+      import('./api.js').then(api => {
+        api.getMe().then(u => setUser(u)).catch(() => localStorage.removeItem('token'))
+      })
+    }
+  }, [])
+
   async function refreshDocs() {
     const items = await listDocuments()
     setDocs(items)
@@ -27,9 +45,22 @@ export default function App() {
   }
 
   useEffect(() => {
-    refreshDocs().catch(e => setError(String(e)))
+    if (user) {
+      refreshDocs().catch(e => setError(String(e)))
+    } else {
+      setDocs([])
+      setActiveDocId(null)
+    }
     // eslint-disable-next-line
-  }, [])
+  }, [user])
+
+  async function onLogin() {
+    window.location.href = 'http://localhost:8000/api/auth/login'
+  }
+
+  async function onLogout() {
+    import('./api.js').then(api => api.logout())
+  }
 
   useEffect(() => {
     if (!activeDocId) return
@@ -171,6 +202,25 @@ export default function App() {
 
       {/* Left: history */}
       <div className="card" style={{padding:12, overflow:'auto'}}>
+        {/* User Profile Section */}
+        <div style={{marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid #333'}}>
+          {user ? (
+            <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+              <img src={user.picture} alt={user.name} style={{width: 32, height: 32, borderRadius: '50%'}} />
+              <div style={{flex: 1, minWidth: 0}}>
+                <div style={{fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{user.name}</div>
+                <div style={{fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{user.email}</div>
+              </div>
+              <button className="btn" onClick={onLogout} style={{padding: '4px 8px', fontSize: 11}}>로그아웃</button>
+            </div>
+          ) : (
+            <button className="btn" onClick={onLogin} style={{width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#4285F4', color: 'white', border: 'none'}}>
+              <svg width="18" height="18" viewBox="0 0 18 18"><path fill="currentColor" d="M17.64 8.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.85 2.21c1.67-1.54 2.63-3.81 2.63-6.56z"></path><path fill="currentColor" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.85-2.21c-.79.53-1.81.85-3.11.85-2.39 0-4.41-1.61-5.14-3.78H.9v2.33C2.39 16.15 5.44 18 9 18z"></path><path fill="currentColor" d="M3.86 10.68c-.19-.56-.3-1.16-.3-1.78s.11-1.22.3-1.78V4.79H.9C.33 5.93 0 7.22 0 8.6c0 1.38.33 2.67.9 3.81l2.96-2.33z"></path><path fill="currentColor" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0 5.44 0 2.39 1.85.9 4.79l2.96 2.33c.73-2.17 2.75-3.78 5.14-3.78z"></path></svg>
+              Google로 로그인
+            </button>
+          )}
+        </div>
+
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
           <div>
             <div style={{fontSize:18, fontWeight:700}}>CONTEXTOR</div>
@@ -251,9 +301,12 @@ export default function App() {
               {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
             </div>
           </div>
-          <button className="btn" onClick={onRunAnalysis} disabled={!activeDocId || loading}>
-            분석 실행
-          </button>
+          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4}}>
+            <button className="btn" onClick={onRunAnalysis} disabled={!activeDocId || loading}>
+              {user ? "분석 실행" : "분석 실행 (개연성 Only)"}
+            </button>
+            {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
+          </div>
         </div>
 
         {error && (
