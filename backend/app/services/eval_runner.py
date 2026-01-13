@@ -8,6 +8,7 @@ from typing import Any, Dict, Tuple
 from sqlalchemy import select
 from app.core.db import Document, EvalRun, get_session
 from app.llm.client import get_upstage_client
+from app.llm.chat import chat
 from app.services.analysis_runner import run_analysis_for_text
 from app.agents.metrics.tone_Metric import ToneOutputValidator
 from app.agents.metrics.causality_metric import CausalityMetricAgent
