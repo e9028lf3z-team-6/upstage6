@@ -61,12 +61,12 @@ cp .env.example .env
 # .env 파일을 열어 UPSTAGE_API_KEY를 입력하세요.
 
 # 서버 실행
-uvicorn main:app --reload --port 8000
+uvicorn main:app --port 8000
 ```
 
 cd backend
 .venv\Scripts\activate
-uvicorn main:app --reload --port 8000
+uvicorn main:app --port 8000
 ### 4. SQLite 마이그레이션 (필요 시)
 기존 `backend/data/team.db`에 컬럼을 추가하려면 아래 스크립트를 실행하세요.
 이미 적용된 컬럼이 있으면 자동으로 건너뜁니다.
