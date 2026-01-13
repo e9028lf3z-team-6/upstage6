@@ -10,12 +10,12 @@ from app.core.db import Document, EvalRun, get_session
 from app.llm.client import get_upstage_client
 from app.llm.chat import chat
 from app.services.analysis_runner import run_analysis_for_text
-from app.agents.metrics.tone_Metric import ToneOutputValidator
-from app.agents.metrics.causality_metric import CausalityMetricAgent
-from app.agents.metrics.Trauma_metric import TraumaMetric
-from app.agents.metrics.HateBias_metric import HateBiasMetricAgent
-from app.agents.metrics.GenerCliche_metric import GenreClicheMetricAgent
-from app.agents.metrics.final_metric import FinalMetricAgent
+from app.agents.evaluators.tone_evaluator import ToneQualityAgent
+from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
+from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
+from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
+from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
+from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
 
 
 def _truncate_report(text: str) -> str:
@@ -86,9 +86,10 @@ def _issue_total(issue_counts: dict) -> int:
 def collect_metrics(outputs: dict) -> dict:
     report = outputs.get("report") or outputs.get("final_report") or {}
     report_markdown = report.get("full_report_markdown", "") if isinstance(report, dict) else ""
+    logic_result = outputs.get("logic") or outputs.get("causality")
     issue_counts = {
         "tone": _issue_count(outputs.get("tone")),
-        "logic": _issue_count(outputs.get("logic")),
+        "logic": _issue_count(logic_result),
         "trauma": _issue_count(outputs.get("trauma")),
         "hate_bias": _issue_count(outputs.get("hate_bias")),
         "genre_cliche": _issue_count(outputs.get("genre_cliche")),
@@ -120,79 +121,62 @@ def collect_metrics(outputs: dict) -> dict:
         "agent_disagreement": round(agent_disagreement, 4),
     }
 
-def _enrich_quality(metrics: dict, issues: list[dict]) -> dict:
-    issue_count = len(issues)
-    evidence_count = 0
-    for issue in issues:
-        if not isinstance(issue, dict):
-            continue
-        if any(
-            issue.get(key)
-            for key in ["evidence", "description", "from_event", "to_event", "location"]
-        ):
-            evidence_count += 1
-    ambiguity_flag = issue_count > 0 and evidence_count < issue_count
-    confidence = 1.0 if issue_count == 0 else round(evidence_count / issue_count, 2)
-    metrics.update(
-        {
-            "evidence_count": evidence_count,
-            "ambiguity_flag": ambiguity_flag,
-            "confidence": confidence,
-        }
-    )
-    return metrics
-
-
-def collect_agent_metrics(outputs: dict) -> Tuple[dict, dict]:
-    tone_validator = ToneOutputValidator()
-    causality_metric = CausalityMetricAgent()
-    trauma_metric = TraumaMetric()
-    hate_metric = HateBiasMetricAgent()
-    cliche_metric = GenreClicheMetricAgent()
-    final_metric = FinalMetricAgent()
+def collect_agent_metrics(
+    outputs: dict,
+    source_text: str | None,
+) -> Tuple[dict, dict]:
+    tone_quality = ToneQualityAgent()
+    causality_quality = CausalityQualityAgent()
+    trauma_quality = TraumaQualityAgent()
+    hate_quality = HateBiasQualityAgent()
+    cliche_quality = GenreClicheQualityAgent()
+    final_evaluator = FinalEvaluatorAgent()
 
     tone_result = outputs.get("tone") or {}
-    logic_result = outputs.get("logic") or {}
+    logic_result = outputs.get("logic") or outputs.get("causality") or {}
     trauma_result = outputs.get("trauma") or {}
     hate_result = outputs.get("hate_bias") or {}
     cliche_result = outputs.get("genre_cliche") or {}
     persona_feedback = outputs.get("persona_feedback")
-    aggregated = outputs.get("aggregated") or {}
+    if persona_feedback is None:
+        debug_payload = outputs.get("debug") or {}
+        persona_feedback = debug_payload.get("persona_feedback")
+    aggregated = outputs.get("aggregated") or outputs.get("aggregate") or {}
 
     latencies_ms: dict[str, float] = {}
-    start = time.perf_counter()
-    tone_metrics = tone_validator.validate(tone_result)
-    latencies_ms["tone"] = round((time.perf_counter() - start) * 1000.0, 2)
+    text = source_text or ""
 
-    start = time.perf_counter()
-    logic_metrics = causality_metric.run(
-        logic_result.get("issues", []),
-        reader_context=None,
-    )
-    latencies_ms["logic"] = round((time.perf_counter() - start) * 1000.0, 2)
-
-    start = time.perf_counter()
-    trauma_metrics = trauma_metric.run(trauma_result)
-    latencies_ms["trauma"] = round((time.perf_counter() - start) * 1000.0, 2)
-
-    start = time.perf_counter()
-    hate_metrics = hate_metric.run(hate_result.get("issues", []))
-    latencies_ms["hate_bias"] = round((time.perf_counter() - start) * 1000.0, 2)
-
-    start = time.perf_counter()
-    cliche_metrics = cliche_metric.run(cliche_result.get("issues", []))
-    latencies_ms["genre_cliche"] = round((time.perf_counter() - start) * 1000.0, 2)
+    def _safe_eval(
+        agent,
+        name: str,
+        *args,
+        expect_score: bool = False,
+        **kwargs,
+    ) -> dict:
+        start = time.perf_counter()
+        result: dict = {}
+        try:
+            result = agent.run(*args, **kwargs)
+            if not isinstance(result, dict):
+                result = {}
+        except Exception as exc:
+            result = {"error": str(exc)}
+        if expect_score and "score" not in result:
+            result["score"] = 0
+        latencies_ms[name] = round((time.perf_counter() - start) * 1000.0, 2)
+        return result
 
     metrics = {
-        "tone": _enrich_quality(tone_metrics, tone_result.get("issues", [])),
-        "logic": _enrich_quality(logic_metrics, logic_result.get("issues", [])),
-        "trauma": _enrich_quality(trauma_metrics, trauma_result.get("issues", [])),
-        "hate_bias": _enrich_quality(hate_metrics, hate_result.get("issues", [])),
-        "genre_cliche": _enrich_quality(cliche_metrics, cliche_result.get("issues", [])),
+        "tone": _safe_eval(tone_quality, "tone", text, tone_result, expect_score=True),
+        "logic": _safe_eval(causality_quality, "logic", text, logic_result, expect_score=True),
+        "trauma": _safe_eval(trauma_quality, "trauma", text, trauma_result, expect_score=True),
+        "hate_bias": _safe_eval(hate_quality, "hate_bias", text, hate_result, expect_score=True),
+        "genre_cliche": _safe_eval(cliche_quality, "genre_cliche", text, cliche_result, expect_score=True),
     }
 
-    start = time.perf_counter()
-    metrics["final"] = final_metric.run(
+    metrics["final"] = _safe_eval(
+        final_evaluator,
+        "final",
         aggregate=aggregated,
         tone_issues=tone_result.get("issues", []),
         logic_issues=logic_result.get("issues", []),
@@ -201,7 +185,6 @@ def collect_agent_metrics(outputs: dict) -> Tuple[dict, dict]:
         cliche_issues=cliche_result.get("issues", []),
         persona_feedback=persona_feedback,
     )
-    latencies_ms["final"] = round((time.perf_counter() - start) * 1000.0, 2)
 
     return metrics, latencies_ms
 
@@ -608,7 +591,7 @@ async def evaluate_text(
         scores.setdefault("llm_judge_status", "disabled")
 
     metrics = collect_metrics(outputs)
-    agent_metrics, agent_latencies = collect_agent_metrics(outputs)
+    agent_metrics, agent_latencies = collect_agent_metrics(outputs, text)
     prompt_version = os.getenv("PROMPT_VERSION")
     agent_version = os.getenv("AGENT_VERSION")
     eval_config_id = os.getenv("EVAL_CONFIG_ID")

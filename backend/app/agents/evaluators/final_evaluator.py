@@ -3,18 +3,17 @@ from app.agents.base import BaseAgent
 from app.llm.chat import chat
 
 
-class FinalMetricAgent(BaseAgent):
+class FinalEvaluatorAgent(BaseAgent):
     """
-    최종 실행 품질 평가 메트릭 에이전트
+    최종 실행 품질 평가 에이전트
 
     역할:
     - 각 에이전트 결과를 기반으로 '출력 품질'을 사후 평가
     - 실험 비교, threshold 튜닝, 운영 로그 분석 목적
     - 실행 안정성 자체가 아니라 에이전트 성능 신호를 요약
-
     """
 
-    name = "final-metrics"
+    name = "final-evaluator"
 
     def run(
         self,
@@ -36,7 +35,7 @@ Do NOT include explanations or markdown.
         prompt = f"""
 다음은 하나의 에이전트 파이프라인 실행 결과 요약이다.
 
-너의 역할은 '에이전트 출력 품질 평가 메트릭'이다.
+너의 역할은 '에이전트 출력 품질 평가'이다.
 
 중요:
 - 너는 의사결정을 하지 않는다.
