@@ -390,16 +390,16 @@ export default function App() {
   // -----------------------------
   function SettingsIcon() {
     return (
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path
-          d="M12 15.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z"
+          d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
           stroke="currentColor"
           strokeWidth="1.6"
         />
         <path
-          d="M19.4 13.5c.04-.5.04-1 0-1.5l2-1.6a.7.7 0 0 0 .16-.9l-1.9-3.3a.7.7 0 0 0-.84-.3l-2.4 1a9.4 9.4 0 0 0-1.3-.75l-.36-2.6A.7.7 0 0 0 13.1 1h-3.8a.7.7 0 0 0-.7.6l-.36 2.6c-.45.2-.9.45-1.3.75l-2.4-1a.7.7 0 0 0-.84.3L1.78 7.5a.7.7 0 0 0 .16.9l2 1.6a9 9 0 0 0 0 1.5l-2 1.6a.7.7 0 0 0-.16.9l1.9 3.3a.7.7 0 0 0 .84.3l2.4-1c.4.3.85.55 1.3.75l.36 2.6a.7.7 0 0 0 .7.6h3.8a.7.7 0 0 0 .7-.6l.36-2.6c.45-.2.9-.45 1.3-.75l2.4 1a.7.7 0 0 0 .84-.3l1.9-3.3a.7.7 0 0 0-.16-.9l-2-1.6Z"
+          d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
           stroke="currentColor"
-          strokeWidth="1.2"
+          strokeWidth="1.4"
           strokeLinejoin="round"
         />
       </svg>
@@ -458,7 +458,7 @@ export default function App() {
         className="card"
         style={{
           padding:12,
-          overflow:'auto',
+          overflow:'hidden',
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0
@@ -545,7 +545,7 @@ export default function App() {
         </div>
 
         {/* ✅ 파란 네모 영역 (스크롤 영역) */}
-        <div style={{marginTop:14, flex: 1, minHeight: 0}}>
+        <div style={{marginTop:14, flex: 1, minHeight: 0, overflow:'auto', paddingBottom:12}}>
           {leftMode === 'upload' && (
             <div>
               {/* 내부 저장소 헤더 */}
@@ -577,11 +577,17 @@ export default function App() {
                   style={{
                     opacity: isUploading ? 0.7 : 1,
                     cursor: isUploading ? 'not-allowed' : 'pointer',
-                    height: 34
+                    width: 100,
+                    height: 42,
+
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+
                   }}
                   title="되돌아오기"
                 >
-                  되돌리기
+                 되돌리기
                 </button>
               </div>
 
@@ -654,21 +660,28 @@ export default function App() {
                   background: '#141417',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: 'center',
                   gap: 10
                 }}
               >
                 <div>
                   <div style={{fontWeight: 800, fontSize: 16}}>설정</div>
                   <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                    (설정 항목은 추후 추가 예정)
+                    설정 내용은 나중에 추가할 것
                   </div>
                 </div>
 
                 <button
                   className="btn"
                   onClick={closeLeftPanelToList}
-                  style={{height: 34}}
+                  style={{opacity: isUploading ? 0.7 : 1,
+                          cursor: isUploading ? 'not-allowed' : 'pointer',
+                          width: 100,
+                          height: 42,
+
+                          display: 'flex',
+                          alignItems: 'center',      // 🔥 핵심
+                          justifyContent: 'center',}}
                   title="되돌리기"
                 >
                   되돌리기
@@ -760,7 +773,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ✅ 빨간 네모 영역: 하단 바 + 오른쪽에 설정 버튼 */}
+        {/* 하단 바 + 오른쪽에 설정 버튼 */}
         <div
           style={{
             marginTop: 12,
@@ -857,7 +870,7 @@ export default function App() {
             placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
             className="mono"
             style={{
-              width: '100%',
+              width: '96%',
               height: 140,
               resize: 'vertical',
               borderRadius: 8,
