@@ -14,7 +14,7 @@ def extract_issues(result: dict | None):
 def rewrite_node(state: AgentState) -> AgentState:
     result = rewrite_agent.run(
         original_text=state["original_text"],
-        split_text=str(state["split_text"]),
+        split_text="",
         decision_context=state["aggregated_result"],
         tone_issues=extract_issues(state.get("tone_result")),
         logic_issues=extract_issues(state.get("logic_result")),

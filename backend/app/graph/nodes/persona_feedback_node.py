@@ -13,7 +13,7 @@ def persona_feedback_node(state: AgentState) -> AgentState:
 
     result = persona_feedback_agent.run(
         persona=persona,
-        split_text=state["split_text"]
+        split_text=state["original_text"]
     )
 
     return {
