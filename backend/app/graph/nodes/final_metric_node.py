@@ -1,5 +1,5 @@
 # app/graph/nodes/final_metric_node.py
-from app.agents.metrics.final_metric_agent import FinalMetricAgent
+from app.agents.metrics.final_metric import FinalMetricAgent
 from app.graph.state import AgentState
 
 final_metric_agent = FinalMetricAgent()
