@@ -1,14 +1,25 @@
 from typing import Any, Dict, Optional
 
 from app.core.settings import get_settings
-from app.services.pipeline_runner import run_full_pipeline
+from app.graph.graph import agent_app
+from app.graph.state import AgentState
+from app.agents.tools.split_agent import SplitAgent
+from app.agents.tools.causality_agent import CausalityEvaluatorAgent
+from app.agents.tools.llm_aggregator import IssueBasedAggregatorAgent
+from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
+from app.agents.evaluators.tone_evaluator import ToneQualityAgent
+from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
+from app.agents.evaluators.tension_evaluator import TensionQualityAgent
+from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
+from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
+from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
+from app.llm.client import has_upstage_api_key
 
-async def run_analysis_for_text(text: str, mode: str = "full") -> Dict[str, Any]:
-    """Run the full multi-agent pipeline.
 
 async def run_analysis_for_text(
     text: str,
     context: Optional[str] = None,
+    mode: str = "full",
 ) -> Dict[str, Any]:
     """
     전체 분석 파이프라인 실행
@@ -19,17 +30,116 @@ async def run_analysis_for_text(
 
     settings = get_settings()
 
-    # --------------------------------------------------
-    # Full LangGraph pipeline (preferred)
-    # --------------------------------------------------
-    if settings.upstage_api_key:
-        return run_full_pipeline(text, debug=True, mode=mode)
+    if has_upstage_api_key():
+        if mode == "full":
+            return _run_langgraph_full(text=text, context=context, mode=mode)
+        return _run_causality_only(text=text, mode=mode)
 
-    # Local fallback: run only split + lightweight heuristics (no LLM).
-    # This keeps the pipeline shape similar to the full output.
+    return _run_fallback(text=text, mode=mode)
+
+
+def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
+    initial_state: AgentState = {
+        "original_text": text,
+        "context": context,
+    }
+    final_state: AgentState = agent_app.invoke(initial_state)
+
+    aggregated = final_state.get("aggregated_result") or {}
+    decision = aggregated.get("decision")
+    final_report = final_state.get("final_report")
+    logic = final_state.get("logic_result") or final_state.get("causality_result")
+    tension = final_state.get("tension_result")
+
+    result = {
+        "split": final_state.get("split_text"),
+        "final_report": final_report,
+        "report": final_report,
+        "decision": decision,
+        "tone": final_state.get("tone_result"),
+        "logic": logic,
+        "trauma": final_state.get("trauma_result"),
+        "hate_bias": final_state.get("hate_bias_result"),
+        "genre_cliche": final_state.get("genre_cliche_result"),
+        "spelling": final_state.get("spelling_result"),
+        "tension_curve": tension,
+        "causality": logic,
+        "aggregate": aggregated,
+        "aggregated": aggregated,
+        "reader_persona": final_state.get("reader_persona"),
+        "persona_feedback": final_state.get("persona_feedback"),
+        "rewrite_guidelines": final_state.get("rewrite_guidelines"),
+        "debug": {"mode": f"langgraph_{mode}"},
+    }
+
+    result["final_metric"] = _run_final_evaluator(result)
+    result["qa_scores"] = _run_qa_scores(text, result, mode="full")
+
+    return result
+
+
+def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
+    split_agent = SplitAgent()
+    causality_agent = CausalityEvaluatorAgent()
+    aggregator = IssueBasedAggregatorAgent()
+
+    try:
+        split_result = split_agent.run(text)
+    except Exception:
+        split_result = {"split_text": [text]}
+
+    causality = {}
+    try:
+        causality = causality_agent.run(
+            split_text=split_result.get("split_text", []),
+            reader_context=None,
+        )
+    except Exception:
+        causality = {"issues": [], "error": "causality agent failed"}
+
+    aggregate = aggregator.run(
+        tone_issues=[],
+        logic_issues=causality.get("issues", []),
+        trauma_issues=[],
+        hate_issues=[],
+        cliche_issues=[],
+        persona_feedback=None,
+        reader_context=None,
+    )
+
+    report = {
+        "full_report_markdown": (
+            "# 개연성 분석 리포트\n\n"
+            "로그인하지 않은 상태에서는 **개연성(Causality)** 분석 결과만 제공됩니다.\n\n"
+            "## 분석 결과 요약\n"
+            + str(causality.get("issues", []))
+        )
+    }
+
+    result = {
+        "split": split_result,
+        "final_report": report,
+        "report": report,
+        "decision": aggregate.decision if hasattr(aggregate, "decision") else None,
+        "tone": {"issues": []},
+        "logic": causality,
+        "causality": causality,
+        "trauma": {"issues": []},
+        "hate_bias": {"issues": []},
+        "genre_cliche": {"issues": []},
+        "spelling": {"issues": []},
+        "aggregate": aggregate.dict() if hasattr(aggregate, "dict") else aggregate,
+        "aggregated": aggregate.dict() if hasattr(aggregate, "dict") else aggregate,
+        "final_metric": {},
+        "qa_scores": _run_qa_scores(text, {"causality": causality}, mode="causality_only"),
+        "debug": {"mode": f"langgraph_{mode}"},
+    }
+    return result
+
+
+def _run_fallback(text: str, mode: str) -> Dict[str, Any]:
     split = _split_text(text)
 
-    # Initialize empty
     tone = {}
     causality = {}
     tension = {}
@@ -48,7 +158,8 @@ async def run_analysis_for_text(
         cliche = _heuristic_genre_cliche(text)
 
     aggregate = {
-        "summary": "(Mock) UPSTAGE_API_KEY가 없어 로컬 휴리스틱으로 분석했습니다." + (" (로그인 필요)" if mode != "full" else ""),
+        "summary": "(Mock) UPSTAGE_API_KEY가 없어 로컬 휴리스틱으로 분석했습니다."
+        + (" (로그인 필요)" if mode != "full" else ""),
         "tone_issues": tone.get("issues", []),
         "logic_issues": causality.get("issues", []),
         "tension": tension,
@@ -64,48 +175,136 @@ async def run_analysis_for_text(
             "tone": tone.get("score", 0),
             "causality": causality.get("score", 0),
             "safety": max(trauma.get("score", 0), hate.get("score", 0)),
-        }
+        },
+    }
+
+    final_report = {
+        "summary": aggregate["summary"],
+        "note": "LLM 미사용: 결과는 데모용 휴리스틱입니다.",
     }
 
     return {
-        # --------------------
-        # production-level keys
-        # --------------------
-        "final_report": {
-            "summary": aggregated["summary"],
-            "note": "LLM 미사용: 결과는 데모용 휴리스틱입니다.",
-        },
-        "decision": aggregated["decision"],
-
-        # --------------------
-        # evaluators (debug=True 기준)
-        # --------------------
+        "split": split,
         "tone": tone,
-        "logic": logic,
+        "logic": causality,
+        "causality": causality,
         "trauma": trauma,
         "hate_bias": hate,
         "genre_cliche": cliche,
+        "spelling": {"issues": []},
         "aggregate": aggregate,
         "final_metric": final_metric,
+        "final_report": final_report,
+        "report": final_report,
+        "decision": None,
         "debug": {"mode": f"local_fallback_{mode}"},
     }
 
 
-def _heuristic_tone(_text: str) -> Dict[str, Any]:
-    return {"issues": [], "note": "heuristic_tone_stub"}
+def _run_final_evaluator(outputs: Dict[str, Any]) -> Dict[str, Any]:
+    final_evaluator = FinalEvaluatorAgent()
+    aggregate = outputs.get("aggregate") or outputs.get("aggregated") or {}
+    if hasattr(aggregate, "dict"):
+        aggregate = aggregate.dict()
+    try:
+        return final_evaluator.run(
+            aggregate=aggregate,
+            tone_issues=(outputs.get("tone") or {}).get("issues", []),
+            logic_issues=(outputs.get("logic") or {}).get("issues", []),
+            trauma_issues=(outputs.get("trauma") or {}).get("issues", []),
+            hate_issues=(outputs.get("hate_bias") or {}).get("issues", []),
+            cliche_issues=(outputs.get("genre_cliche") or {}).get("issues", []),
+            persona_feedback=outputs.get("persona_feedback"),
+        )
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
-def _heuristic_causality(_text: str) -> Dict[str, Any]:
-    return {"issues": [], "note": "heuristic_causality_stub"}
+def _run_qa_scores(text: str, outputs: Dict[str, Any], mode: str) -> Dict[str, int]:
+    scores: Dict[str, int] = {}
+    try:
+        causality_quality = CausalityQualityAgent()
+        scores["causality"] = causality_quality.run(
+            text,
+            outputs.get("logic") or outputs.get("causality") or {},
+        ).get("score", 0)
+
+        if mode == "full":
+            scores["tone"] = ToneQualityAgent().run(text, outputs.get("tone") or {}).get("score", 0)
+            scores["tension"] = TensionQualityAgent().run(text, outputs.get("tension_curve") or {}).get("score", 0)
+            scores["trauma"] = TraumaQualityAgent().run(text, outputs.get("trauma") or {}).get("score", 0)
+            scores["hate_bias"] = HateBiasQualityAgent().run(text, outputs.get("hate_bias") or {}).get("score", 0)
+            scores["cliche"] = GenreClicheQualityAgent().run(text, outputs.get("genre_cliche") or {}).get("score", 0)
+    except Exception:
+        return scores
+    return scores
 
 
-def _heuristic_trauma(_text: str) -> Dict[str, Any]:
-    return {"issues": [], "note": "heuristic_trauma_stub"}
+def _split_text(text: str) -> dict:
+    chunks = [c.strip() for c in text.split("\n\n") if c.strip()]
+    if not chunks:
+        chunks = [text.strip()]
+    return {"split_text": chunks, "num_chunks": len(chunks)}
 
 
-def _heuristic_hate_bias(_text: str) -> Dict[str, Any]:
-    return {"issues": [], "note": "heuristic_hate_bias_stub"}
+def _heuristic_tone(text: str) -> dict:
+    informal = sum(text.count(w) for w in ["ㅋㅋ", "ㅎㅎ", "ㄹㅇ", "쩔", "대박"])
+    formal = sum(text.count(w) for w in ["합니다", "드립니다", "~니다"])
+    score = 7 if formal > informal else 4
+    issues = []
+    if informal > 5 and formal > 0:
+        issues.append({"location": "(전체)", "issue": "격식체와 구어체가 혼재함", "severity": "medium"})
+    return {"score": score, "issues": issues}
 
 
-def _heuristic_genre_cliche(_text: str) -> Dict[str, Any]:
-    return {"issues": [], "note": "heuristic_genre_cliche_stub"}
+def _heuristic_causality(text: str) -> dict:
+    abrupt = sum(text.count(w) for w in ["갑자기", "뜬금", "아무튼", "암튼"])
+    score = max(1, 8 - abrupt)
+    issues = []
+    if abrupt >= 2:
+        issues.append({"location": "(전체)", "issue": "전개 전환이 급격해 보임(휴리스틱)", "severity": "medium"})
+    return {"score": score, "issues": issues}
+
+
+def _heuristic_tension(text: str) -> dict:
+    paras = [p for p in text.split("\n\n") if p.strip()]
+    curve = []
+    for i, p in enumerate(paras[:20]):
+        curve.append({"index": i, "tension": min(10, max(1, len(p) // 120))})
+    return {"curve": curve, "note": "문단 길이 기반 간이 긴장도"}
+
+
+def _heuristic_trauma(text: str) -> dict:
+    keywords = ["자해", "성폭력", "학대", "참사", "테러", "세월호", "9.11"]
+    hits = [k for k in keywords if k in text]
+    issues = []
+    for k in hits:
+        issues.append({"location": k, "issue": f"민감 키워드 포함: {k}", "severity": "high"})
+    return {"score": 9 if hits else 1, "issues": issues}
+
+
+def _heuristic_hate_bias(text: str) -> dict:
+    keywords = ["전라도", "여성치고는", "노처녀", "장애", "게이", "이민자"]
+    hits = [k for k in keywords if k in text]
+    issues = []
+    for k in hits:
+        issues.append({"location": k, "issue": f"편견/혐오 가능 표현: {k}", "severity": "high"})
+    return {"score": 9 if hits else 1, "issues": issues}
+
+
+def _heuristic_genre_cliche(text: str) -> dict:
+    keywords = ["회빙환", "계약 연애", "먼치킨", "시한폭탄", "USB"]
+    hits = [k for k in keywords if k in text]
+    issues = []
+    if hits:
+        issues.append({"location": "(전체)", "issue": f"장르 클리셰로 보이는 요소: {', '.join(hits)}", "severity": "low"})
+    return {"score": 6 if hits else 3, "issues": issues}
+
+
+def _guess_reader_level(text: str) -> str:
+    jargon = sum(text.count(w) for w in ["아키텍처", "파라미터", "창발", "정량", "정성", "프로세스", "메커니즘"])
+    if jargon >= 8:
+        return "대학원/연구자"
+    if jargon >= 3:
+        return "대학(학부)"
+    return "초/중등"
