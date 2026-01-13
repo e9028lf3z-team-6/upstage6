@@ -278,12 +278,15 @@ def render_eval_report(payload: dict) -> str:
         value = agent_metrics.get(key) or {}
         if not value:
             continue
-        issue_count = value.get("issue_count", value.get("issue_count"))
-        lines.append(
-            f"- {key}: issues={issue_count} metrics={value.get('metrics', 'n/a')} "
-            f"confidence={value.get('confidence')} evidence_count={value.get('evidence_count')} "
-            f"ambiguity_flag={value.get('ambiguity_flag')}"
-        )
+        score = value.get("score", "n/a")
+        reason = value.get("reason")
+        error = value.get("error")
+        line = f"- {key}: score={score}"
+        if reason:
+            line += f" reason={reason}"
+        if error:
+            line += f" error={error}"
+        lines.append(line)
         latency = agent_latencies.get(key)
         if latency is not None:
             lines.append(f"- {key}_latency_ms: {latency}")
