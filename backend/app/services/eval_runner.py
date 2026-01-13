@@ -15,6 +15,7 @@ from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
 from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
 from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
 from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
+from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
 from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
 
 
@@ -130,6 +131,7 @@ def collect_agent_metrics(
     trauma_quality = TraumaQualityAgent()
     hate_quality = HateBiasQualityAgent()
     cliche_quality = GenreClicheQualityAgent()
+    spelling_quality = SpellingQualityAgent()
     final_evaluator = FinalEvaluatorAgent()
 
     tone_result = outputs.get("tone") or {}
@@ -137,6 +139,7 @@ def collect_agent_metrics(
     trauma_result = outputs.get("trauma") or {}
     hate_result = outputs.get("hate_bias") or {}
     cliche_result = outputs.get("genre_cliche") or {}
+    spelling_result = outputs.get("spelling") or {}
     persona_feedback = outputs.get("persona_feedback")
     if persona_feedback is None:
         debug_payload = outputs.get("debug") or {}
@@ -172,6 +175,7 @@ def collect_agent_metrics(
         "trauma": _safe_eval(trauma_quality, "trauma", text, trauma_result, expect_score=True),
         "hate_bias": _safe_eval(hate_quality, "hate_bias", text, hate_result, expect_score=True),
         "genre_cliche": _safe_eval(cliche_quality, "genre_cliche", text, cliche_result, expect_score=True),
+        "spelling": _safe_eval(spelling_quality, "spelling", text, spelling_result, expect_score=True),
     }
 
     metrics["final"] = _safe_eval(
