@@ -148,7 +148,10 @@ function HighlightedText({ text, analysisResult }) {
   }
 
   const sentences = analysisResult.split_sentences
-  const allIssues = []
+  // Aggregate all issues from different agents
+  let allIssues = []
+
+  // Helper to collect issues
   const collect = (source, type) => {
     if (source?.issues && Array.isArray(source.issues)) {
       source.issues.forEach(issue => {
@@ -179,10 +182,17 @@ function HighlightedText({ text, analysisResult }) {
     <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
+        // If no issues, return sentence as is (plus a space usually)
         if (sentIssues.length === 0) {
           return <span key={idx}>{sent} </span>
         }
 
+        // Simple highlighting: just highlight the whole sentence if it has issues for now
+        // OR (Advanced): Split sentence by char_start/char_end.
+        // Let's do a simpler version first: Highlight specific ranges if non-overlapping.
+        // For robustness in this MVP, we'll sort issues by start char and try to highlight.
+
+        // Sort by start position
         sentIssues.sort((a, b) => (a.char_start || 0) - (b.char_start || 0))
 
         let lastIndex = 0
@@ -252,6 +262,14 @@ const TOAST_STYLES = {
   error: { borderColor: '#d32f2f', background: 'rgba(211, 47, 47, 0.45)' }
 }
 
+const PERSONA_LEGEND = [
+  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'causality', label: '개연성 에이전트' },
+  { key: 'hate_bias', label: '혐오·편향 에이전트' },
+  { key: 'cliche', label: '장르 클리셰 에이전트' },
+  { key: 'tension', label: '긴장도 에이전트' }
+]
+
 export default function App() {
   const [user, setUser] = useState(null)
 
@@ -269,6 +287,10 @@ export default function App() {
   // settings
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme')
+    return saved === 'light' ? 'light' : 'dark'
+  })
 
   const [toasts, setToasts] = useState([])
 
@@ -290,6 +312,8 @@ export default function App() {
   //  download hover menu
   const [isDownloadOpen, setIsDownloadOpen] = useState(false)
   const downloadCloseTimer = useRef(null)
+  const [isLegendOpen, setIsLegendOpen] = useState(false)
+  const legendCloseTimer = useRef(null)
 
   function pushToast(message, variant = 'info') {
     const id = (toastIdRef.current += 1)
@@ -316,6 +340,11 @@ export default function App() {
       })
     }
   }, [])
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = theme
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   async function onLogin() {
     window.location.href = 'http://localhost:8000/api/auth/login'
@@ -657,6 +686,20 @@ export default function App() {
     }, 180)
   }
 
+  function onLegendEnter() {
+    if (legendCloseTimer.current) {
+      clearTimeout(legendCloseTimer.current)
+      legendCloseTimer.current = null
+    }
+    setIsLegendOpen(true)
+  }
+
+  function onLegendLeave() {
+    legendCloseTimer.current = setTimeout(() => {
+      setIsLegendOpen(false)
+    }, 180)
+  }
+
   return (
     <>
       <style>{`
@@ -677,7 +720,15 @@ export default function App() {
           height: 0;
         }
       `}</style>
-      <div className="scroll-hide" style={{display:'grid', gridTemplateColumns:'300px 1fr 480px', height:'100vh', gap:8}}>
+      <div className="scroll-hide" style={{
+        display:'grid',
+        gridTemplateColumns:'300px 1fr 480px',
+        height:'100vh',
+        gap:8,
+        background: '#0f0f12',
+        filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
+        transition: 'filter 0.2s ease'
+      }}>
       {/* Toast notifications */}
       {toasts.length > 0 && (
         <div style={{
@@ -1050,6 +1101,56 @@ export default function App() {
                     </button>
                   </div>
 
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 12}}>
+                    <div>
+                      <div style={{fontWeight: 800, fontSize: 16}}>테마</div>
+                      <div className="muted" style={{fontSize: 12}}>Light / Dark</div>
+                    </div>
+
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
+                      aria-pressed={theme === 'light'}
+                      style={{
+                        minWidth: 150,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        padding: '6px 10px'
+                      }}
+                    >
+                      <span style={{fontSize: 12, fontWeight: 800}}>
+                        {theme === 'light' ? 'Light' : 'Dark'}
+                      </span>
+
+                      <span aria-hidden="true" style={{
+                        width: SWITCH_W,
+                        height: SWITCH_H,
+                        borderRadius: 999,
+                        background: theme === 'light' ? '#66bb6a' : '#555',
+                        position: 'relative',
+                        display: 'inline-block',
+                        padding: SWITCH_PAD,
+                        boxSizing: 'border-box',
+                        transition: 'background 0.18s ease',
+                        border: '1px solid #2a2a2c'
+                      }}>
+                        <span style={{
+                          width: KNOB,
+                          height: KNOB,
+                          borderRadius: '50%',
+                          background: '#0f0f12',
+                          display: 'block',
+                          transform: theme === 'light' ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
+                          transition: 'transform 0.18s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
+                        }} />
+                      </span>
+                    </button>
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -1148,11 +1249,71 @@ export default function App() {
 
       {/* Center panel */}
       <div className="card scroll-hide" style={{padding:8, overflow:'auto', display:'flex', flexDirection:'column', gap:8}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
-          <div>
-            <div style={{fontSize:16, fontWeight:700}}>원고</div>
-            <div className="muted" style={{fontSize:12}}>
-              {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10}}>
+          <div style={{display:'flex', flexDirection:'column', gap:6}}>
+            <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
+              <div style={{fontSize:16, fontWeight:700, lineHeight:1}}>{activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}</div>
+            </div>
+            <div
+              onMouseEnter={onLegendEnter}
+              onMouseLeave={onLegendLeave}
+              style={{position: 'relative', display: 'inline-flex', alignItems: 'center'}}
+            >
+              <span style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#cfcfd6',
+                padding: '3px 8px',
+                borderRadius: 8,
+                border: '1px solid #2a2a2c',
+                background: '#16161a'
+              }}>
+                페르소나 구성
+              </span>
+
+              {isLegendOpen && (
+                <div
+                  className="card"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    left: 0,
+                    minWidth: 180,
+                    padding: 10,
+                    border: '2px solid #2a2a2c',
+                    background: '#0f0f12',
+                    zIndex: 60,
+                    boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
+                  }}
+                >
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#888',
+                    marginBottom: 8,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5
+                  }}>
+                    Agents by Color
+                  </div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                    {PERSONA_LEGEND.map(item => (
+                      <div key={item.key} style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                        <span style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 3,
+                          background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
+                          border: '1px solid #444'
+                        }} />
+                        <span className="mono" style={{fontSize: 12, color: '#cfcfd6'}}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
