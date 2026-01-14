@@ -4,6 +4,7 @@ from app.graph.state import AgentState
 # entry / context
 from app.graph.nodes.reader_persona_node import reader_persona_node
 from app.graph.nodes.split_node import split_node
+from app.graph.nodes.summary_node import summary_node
 from app.graph.nodes.persona_feedback_node import persona_feedback_node
 
 # evaluators
@@ -34,6 +35,7 @@ graph = StateGraph(AgentState)
 # entry / context
 graph.add_node("reader_persona", reader_persona_node)
 graph.add_node("split", split_node)
+graph.add_node("summary", summary_node)
 graph.add_node("persona_feedback", persona_feedback_node)
 
 # evaluators (parallel)
@@ -64,8 +66,11 @@ graph.set_entry_point("reader_persona")
 # context → split
 graph.add_edge("reader_persona", "split")
 
-# persona_feedback는 split 결과가 필요하므로 split 이후에만 실행
-graph.add_edge("split", "persona_feedback")
+# split → summary
+graph.add_edge("split", "summary")
+
+# persona_feedback는 summary 이후에 실행 (요약본 참고 가능하도록)
+graph.add_edge("summary", "persona_feedback")
 
 # --------------------------------------------------
 # Evaluators (parallel fan-out)
@@ -79,7 +84,7 @@ for node in [
     "spelling",
     "tension_curve",
 ]:
-    graph.add_edge("split", node)
+    graph.add_edge("summary", node)
     graph.add_edge(node, "aggregate")
 
 # persona feedback도 aggregate로

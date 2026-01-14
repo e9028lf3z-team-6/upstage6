@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
@@ -33,43 +34,52 @@ class ComprehensiveReportAgent(BaseAgent):
         cliche_issues: List[dict],
         persona_feedback: dict | None = None,
     ) -> Dict:
-        # 텍스트 일부만 발췌해서 문맥 제공 (전체 텍스트는 너무 길 수 있음)
-        # split_text의 앞부분 요약이나 일부만 사용
+        # 원고의 전반적인 분위기를 알 수 있도록 앞부분 문장들을 추출
         text_preview = ""
         if isinstance(split_text, dict):
-            raw_summary = split_text.get("summary") or split_text.get("split_text")
             raw_sentences = split_text.get("sentences") or split_text.get("split_sentences")
             if isinstance(raw_sentences, list) and raw_sentences:
-                text_preview = "\n".join(raw_sentences[:5])
-            elif raw_summary:
-                text_preview = str(raw_summary)[:1000]
+                # 앞부분 15문장 정도를 보여주어 맥락 파악 도움
+                text_preview = "\n".join(raw_sentences[:15])
+
+        def _format_all_issues(issues: List[dict], title: str) -> str:
+            if not issues:
+                return f"{title}: 발견된 이슈 없음"
+            
+            lines = [f"### {title} (총 {len(issues)}건)"]
+            for iss in issues:
+                idx = iss.get('sentence_index', '?')
+                quote = iss.get('quote') or iss.get('original') or "인용문 없음"
+                reason = iss.get('reason') or iss.get('description') or "사유 없음"
+                severity = iss.get('severity', 'medium')
+                lines.append(f"- [문장 {idx} / 중요도: {severity}] \"{quote}\" -> {reason}")
+            return "\n".join(lines)
 
         system = """
         당신은 냉철하지만 건설적인 조언을 주는 '수석 편집자(Chief Editor)'입니다.
-        당신의 목표는 작가가 이 리포트를 보고 글을 실제로 수정할 수 있도록 돕는 것입니다.
-        
-        결과는 마크다운(Markdown) 형식으로만 작성하십시오.
+        제공된 모든 분석 데이터를 꼼꼼히 검토하여 작가에게 최종 리포트를 작성하십시오.
+        결과는 반드시 마크다운(Markdown) 형식으로만 작성하십시오.
         """
 
         prompt = f"""
-        당신은 냉철하면서도 따뜻한 조언을 주는 '수석 편집자(Chief Editor)'입니다.
-        아래 제공된 [분석 데이터]를 종합하여, 작가가 글을 수정할 수 있도록 돕는 '최종 편집 리포트'를 작성해야 합니다.
+        당신은 수석 편집자입니다. 아래 제공된 [전체 분석 데이터]를 바탕으로 작가를 위한 '최종 편집 리포트'를 작성하세요.
+        절대 데이터를 생략하지 말고, 문서 전체에서 발견된 주요 흐름을 짚어주어야 합니다.
 
-        [분석 데이터]
-        1. 혐오/차별 표현 (Hate/Bias): {len(hate_issues)}건
-           - 세부: {str(hate_issues)[:500]}
-        2. 트라우마 유발 가능성 (Trauma): {len(trauma_issues)}건
-           - 세부: {str(trauma_issues)[:500]}
-        3. 논리/개연성 이슈 (Logic/Causality): {len(logic_issues)}건
-           - 세부: {str(logic_issues)[:500]}
-        4. 말투/어조 이슈 (Tone): {len(tone_issues)}건
-           - 세부: {str(tone_issues)[:500]}
-        5. 장르 클리셰 (Cliche): {len(cliche_issues)}건
-           - 세부: {str(cliche_issues)[:500]}
-        6. 독자 페르소나 피드백:
-           {str(persona_feedback)[:500] if persona_feedback else "없음"}
+        [분석 데이터 요약]
+        {_format_all_issues(hate_issues, "1. 혐오/차별 표현")}
+        
+        {_format_all_issues(trauma_issues, "2. 트라우마 유발 가능성")}
+        
+        {_format_all_issues(logic_issues, "3. 논리/개연성 이슈")}
+        
+        {_format_all_issues(tone_issues, "4. 말투/어조 이슈")}
+        
+        {_format_all_issues(cliche_issues, "5. 장르 클리셰")}
 
-        [원고 미리보기 (일부)]
+        [6. 독자 페르소나 피드백]
+        {json.dumps(persona_feedback, ensure_ascii=False) if persona_feedback else "특이사항 없음"}
+
+        [원고 일부 (맥락 참조용)]
         {text_preview}
 
         [작성 지침 및 구조]
