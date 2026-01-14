@@ -34,6 +34,107 @@ function Badge({ children }) {
   )
 }
 
+const ISSUE_COLORS = {
+  spelling: 'rgba(239, 83, 80, 0.4)',     // Red for spelling
+  causality: 'rgba(255, 202, 40, 0.4)',   // Amber for logic/causality
+  hate_bias: 'rgba(171, 71, 188, 0.4)',   // Purple for ethical/bias
+  cliche: 'rgba(66, 165, 245, 0.4)',      // Blue for cliches
+  tension: 'rgba(255, 112, 67, 0.4)',     // Orange for tension
+  default: 'rgba(158, 158, 158, 0.4)'
+}
+
+function HighlightedText({ text, analysisResult }) {
+  // If no detailed analysis data, just show text
+  if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
+    return <div style={{whiteSpace:'pre-wrap', lineHeight:1.6}}>{text}</div>
+  }
+
+  const sentences = analysisResult.split_sentences
+  
+  // Aggregate all issues from different agents
+  let allIssues = []
+  
+  // Helper to collect issues
+  const collect = (source, type) => {
+    if (source?.issues && Array.isArray(source.issues)) {
+      source.issues.forEach(issue => {
+        allIssues.push({ ...issue, type })
+      })
+    }
+  }
+
+  collect(analysisResult.spelling, 'spelling')
+  collect(analysisResult.causality, 'causality')
+  collect(analysisResult.hate_bias, 'hate_bias')
+  collect(analysisResult.genre_cliche, 'cliche')
+  // Add other agents if needed
+
+  // Group issues by sentence_index
+  const issuesBySentence = {}
+  allIssues.forEach(issue => {
+    if (typeof issue.sentence_index === 'number') {
+      if (!issuesBySentence[issue.sentence_index]) {
+        issuesBySentence[issue.sentence_index] = []
+      }
+      issuesBySentence[issue.sentence_index].push(issue)
+    }
+  })
+
+  return (
+    <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
+      {sentences.map((sent, idx) => {
+        const sentIssues = issuesBySentence[idx] || []
+        
+        // If no issues, return sentence as is (plus a space usually)
+        if (sentIssues.length === 0) {
+          return <span key={idx}>{sent} </span>
+        }
+
+        // Simple highlighting: just highlight the whole sentence if it has issues for now
+        // OR (Advanced): Split sentence by char_start/char_end. 
+        // Let's do a simpler version first: Highlight specific ranges if non-overlapping.
+        // For robustness in this MVP, we'll sort issues by start char and try to highlight.
+        
+        // Sort by start position
+        sentIssues.sort((a, b) => (a.char_start || 0) - (b.char_start || 0))
+
+        let lastIndex = 0
+        const fragments = []
+        
+        sentIssues.forEach((issue, i) => {
+          const start = issue.char_start || 0
+          const end = issue.char_end || sent.length
+          
+          if (start > lastIndex) {
+            fragments.push(<span key={`txt-${i}`}>{sent.slice(lastIndex, start)}</span>)
+          }
+          
+          const color = ISSUE_COLORS[issue.type] || ISSUE_COLORS.default
+          const title = `${issue.type.toUpperCase()}: ${issue.reason || issue.suggestion || 'Issue found'}`
+          
+          fragments.push(
+            <mark key={`iss-${i}`} style={{backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2}} title={title}>
+              {sent.slice(start, end)}
+            </mark>
+          )
+          
+          lastIndex = end
+        })
+
+        if (lastIndex < sent.length) {
+          fragments.push(<span key={`end`}>{sent.slice(lastIndex)}</span>)
+        }
+
+        return (
+          <span key={idx} style={{marginRight: 4}}>
+            {fragments}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 function formatElapsed(sec) {
   const s = Math.max(0, Math.floor(sec || 0))
   const m = Math.floor(s / 60)
@@ -1056,9 +1157,15 @@ export default function App() {
 
         <div className="scroll-hide" style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
           {activeDoc ? (
-            <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
-              {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
-            </pre>
+            activeAnalysis?.result?.split_sentences ? (
+               <div className="mono" style={{paddingBottom: 40}}>
+                 <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} />
+               </div>
+            ) : (
+              <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
+                {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
+              </pre>
+            )
           ) : (
             <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
           )}
