@@ -1,6 +1,9 @@
 from app.agents.base import BaseAgent
 from app.llm.embedding import embed_text
 from app.services.split_map import build_split_payload
+import logging
+
+logger = logging.getLogger(__name__)
 
 """
 [SplitAgent]
@@ -40,9 +43,18 @@ class SplitAgent(BaseAgent):
     name = "split-tools"
 
     def run(self, input_data: str) -> dict:
-        embedding = embed_text(input_data)
+        logger.info(f"[DEBUG] SplitAgent.run: Input len={len(input_data)}")
+        
+        # REMOVED: embed_text call causing 400 Bad Request on large texts
+        # embedding = embed_text(input_data)
+        
+        # Use a dummy dimension or None, as the actual vector wasn't being used anyway
+        dummy_embedding_dim = 4096 
 
-        return build_split_payload(
+        logger.info("[DEBUG] SplitAgent.run: Calling build_split_payload...")
+        result = build_split_payload(
             input_data,
-            embedding_dim=len(embedding),
+            embedding_dim=dummy_embedding_dim,
         )
+        logger.info("[DEBUG] SplitAgent.run: build_split_payload done.")
+        return result
