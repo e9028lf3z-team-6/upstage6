@@ -10,7 +10,7 @@ class ToneEvaluatorAgent(BaseAgent):
     말투 분석 전문 에이전트
 
     역할:
-    - split_text(말투 구조 텍스트)를 입력으로 받음
+    - 문장 목록을 입력으로 받음
     - 말투/서술 방식으로 인해 독자가 개연성을 느끼기 어려운 지점을 식별
     - 독자 경험 관점의 문제 지점만 표기
 
@@ -33,7 +33,7 @@ class ToneEvaluatorAgent(BaseAgent):
         split_context = format_split_payload(split_payload)
 
         prompt = f"""
-        다음은 원고의 말투를 구조적으로 정리한 텍스트와 문장 목록이다.
+        다음은 원고의 문장 목록이다.
 
         너의 역할은 '말투 분석 에이전트'이다.
         단, 말투를 미학적으로 평가하지 않는다.
@@ -72,7 +72,7 @@ class ToneEvaluatorAgent(BaseAgent):
         - char_start/end는 해당 문장 내 0-based 위치다.
         - quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
 
-        입력 텍스트:
+        문장 목록:
         {split_context}
         """
 

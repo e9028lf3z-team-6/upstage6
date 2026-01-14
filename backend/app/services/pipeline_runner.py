@@ -62,9 +62,7 @@ spelling_quality_agent = SpellingQualityAgent()
 
 def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     def _fallback_split_payload(source_text: str) -> dict:
-        chunks = [chunk.strip() for chunk in source_text.split("\n\n") if chunk.strip()]
-        summary = "\n\n".join(chunks[:5]) if chunks else source_text.strip()
-        return build_split_payload(source_text, summary=summary)
+        return build_split_payload(source_text)
 
     # 1. split
     try:
@@ -82,7 +80,6 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     try:
         persona = persona_agent.run({
             "text": text,
-            "split_text": split_result.get("split_text", []),
             "split_sentences": split_result.get("split_sentences", []),
         })
         reader_context = persona.get("persona")

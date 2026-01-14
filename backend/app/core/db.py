@@ -33,6 +33,11 @@ class Document(Base):
     extracted_text: Mapped[str] = mapped_column(Text)
     meta_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[str] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
     user: Mapped["User | None"] = relationship(back_populates="documents")
     analyses: Mapped[list["Analysis"]] = relationship(back_populates="document", cascade="all, delete-orphan")

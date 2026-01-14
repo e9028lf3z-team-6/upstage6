@@ -23,7 +23,7 @@ JSON 외 텍스트 출력 금지.
         split_context = format_split_payload(split_payload)
 
         prompt = f"""
-다음은 독자 페르소나와 원고 분리 결과이다.
+다음은 독자 페르소나와 원고 문장 목록이다.
 페르소나 관점에서 글을 읽었다고 가정하고 피드백을 생성하라.
 
 규칙:
@@ -41,7 +41,7 @@ JSON 외 텍스트 출력 금지.
 페르소나:
 {persona}
 
-분리 결과:
+문장 목록:
 {split_context}
 
 출력 JSON 형식:
