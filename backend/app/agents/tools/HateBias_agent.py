@@ -1,6 +1,7 @@
 from typing import Dict
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import format_split_payload
 
 
 class HateBiasAgent(BaseAgent):
@@ -22,15 +23,17 @@ class HateBiasAgent(BaseAgent):
 
     name = "hate-bias-tools"
 
-    def run(self, split_text: str) -> Dict:
+    def run(self, split_payload: object) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
 Do NOT include explanations or markdown.
 """
 
+        split_context = format_split_payload(split_payload)
+
         prompt = f"""
-다음은 글을 구조적으로 분리한 텍스트이다.
+다음은 글의 문장 목록이다.
 
 너의 역할은 '혐오 및 편견 표현 탐지기'이다.
 
@@ -62,10 +65,16 @@ Do NOT include explanations or markdown.
 {{
   "issues": [
     {{
-      "location": "문제 표현 위치 또는 문단",
+      "issue_type": "bias | hate | stereotype",
+      "severity": "low | medium | high",
+      "sentence_index": 0,
+      "char_start": 0,
+      "char_end": 0,
+      "quote": "문제 구간 원문 인용",
+      "reason": "집단 일반화 또는 차별로 해석될 수 있는 이유",
       "target": "집단/대상 (예: 특정 집단, 성별, 국가, 직업 등)",
       "bias_type": "혐오 | 편견 | 비하 | 고정관념",
-      "description": "집단 일반화 또는 차별로 해석될 수 있는 이유"
+      "confidence": 0.0
     }}
   ],
   "note": "hate and bias scan completed"
@@ -73,8 +82,13 @@ Do NOT include explanations or markdown.
 
 특별한 문제가 없으면 issues는 빈 배열로 반환하라.
 
-분석 대상 텍스트:
-{split_text}
+규칙:
+- sentence_index는 문장 목록 JSON 배열의 인덱스다.
+- char_start/end는 해당 문장 내 0-based 위치다.
+- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
+문장 목록:
+{split_context}
 """
 
         response = chat(prompt, system=system)

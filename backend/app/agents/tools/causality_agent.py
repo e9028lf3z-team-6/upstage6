@@ -1,5 +1,6 @@
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import format_split_payload
 
 
 class CausalityEvaluatorAgent(BaseAgent):
@@ -17,7 +18,7 @@ class CausalityEvaluatorAgent(BaseAgent):
 
     name = "causality_agent"
 
-    def run(self, split_text: str, reader_context: dict | None = None) -> dict:
+    def run(self, split_payload: object, reader_context: dict | None = None) -> dict:
         """
         reader_context 예시:
         {
@@ -35,8 +36,10 @@ You MUST output valid JSON only.
 Do NOT include explanations or markdown.
 """
 
+        split_context = format_split_payload(split_payload)
+
         prompt = f"""
-다음은 원고를 구조적으로 분리한 결과이다.
+다음은 원고의 문장 목록이다.
 
 너의 역할은 '인과관계 분석가'이다.
 오직 사건 간 인과 연결만 보고, 인과가 끊기는 지점을 식별하라.
@@ -58,19 +61,29 @@ Do NOT include explanations or markdown.
 {{
   "issues": [
     {{
-      "type": "missing_motivation | causality_gap | forced_resolution | illogical_transition",
+      "issue_type": "missing_motivation | causality_gap | forced_resolution | illogical_transition",
+      "severity": "low | medium | high",
+      "sentence_index": 0,
+      "char_start": 0,
+      "char_end": 0,
+      "quote": "문제 구간 원문 인용",
+      "reason": "독자 기준에서 왜 인과가 끊기는지 간단히 설명",
       "from_event": "사건 A(요약)",
       "to_event": "사건 B(요약)",
-      "location": "사건 흐름 단계 또는 항목",
-      "description": "독자 기준에서 왜 인과가 끊기는지 간단히 설명"
+      "confidence": 0.0
     }}
   ]
 }}
 
 문제가 없다면 issues는 빈 배열로 반환하라.
 
-구조 텍스트:
-{split_text}
+규칙:
+- sentence_index는 문장 목록 JSON 배열의 인덱스다.
+- char_start/end는 해당 문장 내 0-based 위치다.
+- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
+문장 목록:
+{split_context}
 """
 
         response = chat(prompt, system=system)

@@ -8,7 +8,7 @@ trauma_agent = TraumaAgent()
 @traceable_timed(name="trauma")
 def trauma_node(state: AgentState) -> AgentState:
     result = trauma_agent.run(
-        split_text=str(state["original_text"])
+        state.get("split_text")
     )
 
     return {

@@ -1,6 +1,7 @@
 from typing import Dict
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import format_split_payload
 
 
 class TensionCurveAgent(BaseAgent):
@@ -20,15 +21,17 @@ class TensionCurveAgent(BaseAgent):
 
     name = "tension-curve-tools"
 
-    def run(self, split_text: str) -> Dict:
+    def run(self, split_payload: object) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
 Do NOT include explanations or markdown.
 """
 
+        split_context = format_split_payload(split_payload)
+
         prompt = f"""
-다음은 원고를 구조적으로 분리한 결과이다.
+다음은 원고의 문장 목록이다.
 
 너의 역할은 '서사 긴장도 분석가'이다.
 사건 흐름을 따라 독자가 느끼는 긴장도의 변화를 분석하라.
@@ -54,6 +57,18 @@ Do NOT include explanations or markdown.
       "reason": "독자 관점에서 그렇게 판단한 간단한 이유"
     }}
   ],
+  "issues": [
+    {{
+      "issue_type": "tension_drop | climax_missing | tension_overload | stagnation",
+      "severity": "low | medium | high",
+      "sentence_index": 0,
+      "char_start": 0,
+      "char_end": 0,
+      "quote": "문제 구간 원문 인용",
+      "reason": "서사 구조 관점에서의 문제 설명",
+      "confidence": 0.0
+    }}
+  ],
   "anomalies": [
     {{
       "location": "문제 구간",
@@ -63,10 +78,15 @@ Do NOT include explanations or markdown.
   ]
 }}
 
-특별한 이상이 없다면 anomalies는 빈 배열로 반환하라.
+특별한 이상이 없다면 issues/anomalies는 빈 배열로 반환하라.
 
-구조 텍스트:
-{split_text}
+규칙:
+- sentence_index는 문장 목록 JSON 배열의 인덱스다.
+- char_start/end는 해당 문장 내 0-based 위치다.
+- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
+문장 목록:
+{split_context}
 """
 
         response = chat(prompt, system=system)

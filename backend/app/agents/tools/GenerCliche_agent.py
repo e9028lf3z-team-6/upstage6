@@ -1,6 +1,7 @@
 from typing import Dict
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import format_split_payload
 
 
 class GenreClicheAgent(BaseAgent):
@@ -25,15 +26,17 @@ class GenreClicheAgent(BaseAgent):
 
     name = "genre-cliche-tools"
 
-    def run(self, split_text: str) -> Dict:
+    def run(self, split_payload: object) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
 Do NOT include explanations or markdown.
 """
 
+        split_context = format_split_payload(split_payload)
+
         prompt = f"""
-다음은 서사를 구조적으로 분리한 텍스트이다.
+다음은 서사의 문장 목록이다.
 
 너의 역할은 '장르 클리셰 탐지기'이다.
 
@@ -64,18 +67,30 @@ Do NOT include explanations or markdown.
 {{
   "issues": [
     {{
+      "issue_type": "cliche_pattern",
+      "severity": "low | medium | high",
+      "sentence_index": 0,
+      "char_start": 0,
+      "char_end": 0,
+      "quote": "문제 구간 원문 인용",
+      "reason": "왜 독자에게 익숙한 클리셰로 인식될 수 있는지 설명",
       "genre": "추정 장르 (예: 성장, 드라마, 액션 등)",
       "pattern": "전형적으로 반복되는 서사 패턴 요약",
-      "description": "왜 독자에게 익숙한 클리셰로 인식될 수 있는지 설명"
+      "confidence": 0.0
     }}
   ],
-  "note": "genre cliché scan completed"
+  "note": "genre cliche scan completed"
 }}
 
 특별한 클리셰가 감지되지 않으면 issues는 빈 배열로 반환하라.
 
-분석 대상 텍스트:
-{split_text}
+규칙:
+- sentence_index는 문장 목록 JSON 배열의 인덱스다.
+- char_start/end는 해당 문장 내 0-based 위치다.
+- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
+문장 목록:
+{split_context}
 """
 
         response = chat(prompt, system=system)

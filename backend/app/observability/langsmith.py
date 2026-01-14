@@ -1,6 +1,8 @@
 import os
 import time
 
+from app.core.settings import get_settings
+
 try:
     from langsmith import Client as _LangSmithClient
     from langsmith import traceable as _traceable
@@ -14,7 +16,25 @@ except Exception:  # pragma: no cover - optional dependency/runtime
     _get_current_run_tree = None
 
 
+def _apply_settings_env() -> None:
+    settings = get_settings()
+    if settings.langsmith_api_key:
+        os.environ.setdefault("LANGSMITH_API_KEY", settings.langsmith_api_key)
+        os.environ.setdefault("LANGCHAIN_API_KEY", settings.langsmith_api_key)
+    if settings.langsmith_project:
+        os.environ.setdefault("LANGSMITH_PROJECT", settings.langsmith_project)
+        os.environ.setdefault("LANGCHAIN_PROJECT", settings.langsmith_project)
+    if settings.langsmith_endpoint:
+        os.environ.setdefault("LANGSMITH_ENDPOINT", settings.langsmith_endpoint)
+        os.environ.setdefault("LANGCHAIN_ENDPOINT", settings.langsmith_endpoint)
+    if settings.langsmith_tracing and not os.getenv("LANGSMITH_TRACING"):
+        os.environ["LANGSMITH_TRACING"] = "true"
+    if settings.langsmith_tracing and not os.getenv("LANGCHAIN_TRACING_V2"):
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+
+
 def _is_enabled() -> bool:
+    _apply_settings_env()
     flags = [
         os.getenv("LANGSMITH_TRACING", ""),
         os.getenv("LANGCHAIN_TRACING_V2", ""),

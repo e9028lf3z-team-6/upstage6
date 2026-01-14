@@ -16,10 +16,11 @@ def causality_node(state: AgentState) -> AgentState:
         }
 
     result = causality_agent.run(
-        split_text=state["original_text"],
+        state.get("split_text"),
         reader_context=reader_context
     )
 
     return {
         "logic_result": result
     }
+

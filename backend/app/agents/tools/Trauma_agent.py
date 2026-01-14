@@ -1,6 +1,7 @@
 from typing import Dict, List
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import format_split_payload
 
 
 class TraumaAgent(BaseAgent):
@@ -20,15 +21,17 @@ class TraumaAgent(BaseAgent):
 
     name = "trauma-tools"
 
-    def run(self, split_text: str) -> Dict:
+    def run(self, split_payload: object) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
 Do NOT include explanations or markdown.
 """
 
+        split_context = format_split_payload(split_payload)
+
         prompt = f"""
-다음은 글을 구조적으로 분리한 텍스트이다.
+다음은 글의 문장 목록이다.
 
 너의 역할은 '트라우마 위험 표현 탐지기'이다.
 
@@ -52,9 +55,15 @@ Do NOT include explanations or markdown.
 {{
   "issues": [
     {{
-      "location": "문제 표현 위치 또는 문단",
+      "issue_type": "trauma_trigger",
+      "severity": "low | medium | high",
+      "sentence_index": 0,
+      "char_start": 0,
+      "char_end": 0,
+      "quote": "문제 구간 원문 인용",
+      "reason": "독자에게 트라우마를 유발할 수 있다고 판단한 이유",
       "trigger_type": "사고 | 위험행동 | 재난 | 생명위협 | 공포묘사",
-      "description": "독자에게 트라우마를 유발할 수 있다고 판단한 이유"
+      "confidence": 0.0
     }}
   ],
   "note": "trauma risk scan completed"
@@ -62,8 +71,13 @@ Do NOT include explanations or markdown.
 
 특별한 위험 표현이 없으면 issues는 빈 배열로 반환하라.
 
-분석 대상 텍스트:
-{split_text}
+규칙:
+- sentence_index는 문장 목록 JSON 배열의 인덱스다.
+- char_start/end는 해당 문장 내 0-based 위치다.
+- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
+문장 목록:
+{split_context}
 """
 
         response = chat(prompt, system=system)

@@ -8,7 +8,7 @@ hate_bias_agent = HateBiasAgent()
 @traceable_timed(name="hate_bias")
 def hate_bias_node(state: AgentState) -> AgentState:
     result = hate_bias_agent.run(
-        split_text=state["original_text"]
+        state.get("split_text")
     )
 
     return {
