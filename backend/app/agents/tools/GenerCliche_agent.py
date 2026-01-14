@@ -26,7 +26,7 @@ class GenreClicheAgent(BaseAgent):
 
     name = "genre-cliche-tools"
 
-    def run(self, split_payload: object) -> Dict:
+    def run(self, split_payload: object, global_summary: str | None = None) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
@@ -40,9 +40,13 @@ Do NOT include explanations or markdown.
 
 너의 역할은 '장르 클리셰 탐지기'이다.
 
+[전체 맥락 요약 (참조용)]
+{global_summary or "제공되지 않음"}
+
 목표:
 - 서사 전개에서 특정 장르에서 자주 반복되는 전형적 패턴을 식별하라.
 - 해당 패턴이 '익숙한 클리셰로 인식될 가능성'만 기술하라.
+- [전체 맥락 요약]을 통해 글의 전반적인 장르와 흐름을 파악하여 더 정확하게 탐지하라.
 
 탐지 대상 예시:
 - 성장 서사에서 위기 상황 중 갑작스러운 각성

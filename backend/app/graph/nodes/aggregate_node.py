@@ -2,11 +2,15 @@
 from app.agents import IssueBasedAggregatorAgent
 from app.graph.state import AgentState
 from app.observability.langsmith import traceable_timed
+import logging
+
+logger = logging.getLogger(__name__)
 
 aggregator_agent = IssueBasedAggregatorAgent()
 
 @traceable_timed(name="aggregate")
 def aggregate_node(state: AgentState) -> AgentState:
+    logger.info("[PROGRESS] 4/6 - 모든 분석 결과 취합 및 검증 중...")
     def extract_issues(result: dict | None):
         if not result:
             return []
