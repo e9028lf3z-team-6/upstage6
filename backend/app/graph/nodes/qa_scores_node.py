@@ -9,6 +9,9 @@ from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
 from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
 from app.graph.state import AgentState
 from app.observability.langsmith import traceable_timed
+import logging
+
+logger = logging.getLogger(__name__)
 
 tone_quality_agent = ToneQualityAgent()
 causality_quality_agent = CausalityQualityAgent()
@@ -35,6 +38,7 @@ def _safe_score(agent, name: str, *args) -> dict:
 
 @traceable_timed(name="qa_scores")
 def qa_scores_node(state: AgentState) -> AgentState:
+    logger.info("[PROGRESS] 6/6 - 최종 점수 산출 및 완료.")
     original_text = state.get("original_text") or ""
     logic_result = state.get("logic_result") or state.get("causality_result") or {}
 
