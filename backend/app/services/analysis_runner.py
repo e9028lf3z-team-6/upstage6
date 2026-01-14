@@ -35,7 +35,7 @@ async def run_analysis_for_text(
 
     if has_upstage_api_key():
         if mode == "full":
-            return _run_langgraph_full(text=text, context=context, mode=mode)
+            return await _run_langgraph_full(text=text, context=context, mode=mode)
         return _run_causality_only(text=text, mode=mode)
 
     return _run_fallback(text=text, mode=mode)
@@ -56,7 +56,7 @@ def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) 
         result["split_map"] = split_payload.get("split_map")
 
 
-def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
+async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
     initial_state: AgentState = {
         "original_text": text,
         "context": context,
