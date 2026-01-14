@@ -1,5 +1,6 @@
 # app/graph/nodes/report_node.py
 from app.agents import ComprehensiveReportAgent
+from app.agents.utils import extract_split_payload
 from app.graph.state import AgentState
 from app.observability.langsmith import traceable_timed
 
@@ -12,12 +13,12 @@ def extract_issues(result: dict | None):
 
 @traceable_timed(name="report")
 def report_node(state: AgentState) -> AgentState:
-    # SplitAgent 제거로 인해 original_text를 split_text 구조로 래핑하여 전달
-    original_text = state.get("original_text", "")
-    mock_split_text = {"split_text": [original_text]}
-
+    split_summary, split_sentences = extract_split_payload(state.get("split_text"))
     report = report_agent.run(
-        split_text=mock_split_text,
+        split_text={
+            "summary": split_summary,
+            "sentences": split_sentences,
+        },
         tone_issues=extract_issues(state.get("tone_result")),
         logic_issues=extract_issues(state.get("logic_result")),
         trauma_issues=extract_issues(state.get("trauma_result")),

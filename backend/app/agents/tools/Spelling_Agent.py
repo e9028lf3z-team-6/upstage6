@@ -1,5 +1,7 @@
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
+from app.agents.utils import extract_split_payload
+import json
 
 
 class SpellingAgent(BaseAgent):
@@ -14,15 +16,18 @@ class SpellingAgent(BaseAgent):
 
     name = "spelling-agent"
 
-    def run(self, split_text: list[str]) -> dict:
+    def run(self, split_payload: object) -> dict:
         system = """
 너는 맞춤법 오류 탐지 전용 시스템이다.
 반드시 JSON만 출력한다.
 설명, 문장, 마크다운, 추가 텍스트 출력 금지.
 """
 
+        _, sentences = extract_split_payload(split_payload)
+        split_context = json.dumps(sentences, ensure_ascii=False)
+
         prompt = f"""
-입력은 문장 배열이다.
+입력은 문장 배열(JSON)이다.
 index는 0부터 시작한다.
 
 역할:
@@ -34,21 +39,26 @@ index는 0부터 시작한다.
 {{
   "issues": [
     {{
-      "location": {{
-        "sentence_index": 0,
-        "char_start": 0,
-        "char_end": 0
-      }},
-      "error_type": "spelling | spacing | particle | nonstandard",
-      "original": "문제가 되는 표현",
-      "description": "형식적 오류 설명"
+      "issue_type": "spelling | spacing | particle | nonstandard",
+      "severity": "low | medium | high",
+      "sentence_index": 0,
+      "char_start": 0,
+      "char_end": 0,
+      "quote": "문제가 되는 표현",
+      "reason": "형식적 오류 설명",
+      "confidence": 0.0
     }}
   ],
   "note": "ok | minor | many"
 }}
 
+규칙:
+- sentence_index는 문장 목록 JSON 배열의 인덱스다.
+- char_start/end는 해당 문장 내 0-based 위치다.
+- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
+
 문장 배열:
-{split_text}
+{split_context}
 """
 
         response = chat(prompt, system=system)

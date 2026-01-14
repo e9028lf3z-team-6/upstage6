@@ -8,7 +8,7 @@ tension_curve_agent = TensionCurveAgent()
 @traceable_timed(name="tension_curve")
 def tension_curve_node(state: AgentState) -> AgentState:
     result = tension_curve_agent.run(
-        split_text=state["original_text"]
+        state.get("split_text")
     )
 
     return {
