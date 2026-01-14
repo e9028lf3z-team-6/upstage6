@@ -18,7 +18,7 @@ class CausalityEvaluatorAgent(BaseAgent):
 
     name = "causality_agent"
 
-    def run(self, split_payload: object, reader_context: dict | None = None) -> dict:
+    def run(self, split_payload: object, reader_context: dict | None = None, global_summary: str | None = None) -> dict:
         """
         reader_context 예시:
         {
@@ -44,6 +44,9 @@ Do NOT include explanations or markdown.
 너의 역할은 '인과관계 분석가'이다.
 오직 사건 간 인과 연결만 보고, 인과가 끊기는 지점을 식별하라.
 
+[전체 맥락 요약 (참조용)]
+{global_summary or "제공되지 않음"}
+
 독자 이해 수준:
 - 초급: 인과 관계, 동기, 전제가 명시되지 않으면 문제로 간주
 - 중급: 핵심 인과와 동기가 누락된 경우만 문제로 간주
@@ -56,6 +59,7 @@ Do NOT include explanations or markdown.
 - 수정 제안 금지
 - 말투/표현/안전성 판단 금지
 - 오직 인과관계 이해가 끊기는 지점만 식별
+- [전체 맥락 요약]을 참고하여, 앞부분의 설정이 뒷부분에서 어긋나는지(개연성) 확인하라.
 
 출력 형식(JSON):
 {{
