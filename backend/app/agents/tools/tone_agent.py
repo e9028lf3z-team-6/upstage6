@@ -22,7 +22,7 @@ class ToneEvaluatorAgent(BaseAgent):
 
     name = "tone-evaluator"
 
-    def run(self, split_payload: object) -> dict:
+    def run(self, split_payload: object, global_summary: str | None = None) -> dict:
         system = """
         너는 JSON 출력 전용 엔진이다.
         반드시 유효한 JSON만 출력해야 한다.
@@ -38,10 +38,14 @@ class ToneEvaluatorAgent(BaseAgent):
         너의 역할은 '말투 분석 에이전트'이다.
         단, 말투를 미학적으로 평가하지 않는다.
 
+        [전체 맥락 요약 (참조용)]
+        {global_summary or "제공되지 않음"}
+
         반드시 지켜야 할 규칙:
         - 점수, 등급, 총평을 만들지 말 것
         - 문장을 수정하거나 대체 표현을 제안하지 말 것
         - 오직 '독자 관점에서 개연성이 약해지는 말투 지점'만 식별할 것
+        - [전체 맥락 요약]을 참고하여, 인물의 말투가 상황이나 설정에 어긋나는지 확인하라.
 
         분석 기준 (개연성 중심):
         - 말투 변화가 맥락 없이 발생하는 지점
