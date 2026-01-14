@@ -9,7 +9,8 @@ import {
   listDocuments,
   runAnalysis,
   updateDocument,
-  uploadDocument
+  uploadDocument,
+  API_BASE
 } from './api.js'
 
 function pretty(obj) {
@@ -296,7 +297,7 @@ export default function App() {
   }, [])
 
   async function onLogin() {
-    window.location.href = 'http://localhost:8000/api/auth/login'
+    window.location.href = `${API_BASE}/auth/login`
   }
 
   async function onLogout() {
