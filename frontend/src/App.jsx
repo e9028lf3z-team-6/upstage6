@@ -34,6 +34,107 @@ function Badge({ children }) {
   )
 }
 
+const ISSUE_COLORS = {
+  spelling: 'rgba(239, 83, 80, 0.4)',     // Red for spelling
+  causality: 'rgba(255, 202, 40, 0.4)',   // Amber for logic/causality
+  hate_bias: 'rgba(171, 71, 188, 0.4)',   // Purple for ethical/bias
+  cliche: 'rgba(66, 165, 245, 0.4)',      // Blue for cliches
+  tension: 'rgba(255, 112, 67, 0.4)',     // Orange for tension
+  default: 'rgba(158, 158, 158, 0.4)'
+}
+
+function HighlightedText({ text, analysisResult }) {
+  // If no detailed analysis data, just show text
+  if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
+    return <div style={{whiteSpace:'pre-wrap', lineHeight:1.6}}>{text}</div>
+  }
+
+  const sentences = analysisResult.split_sentences
+
+  // Aggregate all issues from different agents
+  let allIssues = []
+
+  // Helper to collect issues
+  const collect = (source, type) => {
+    if (source?.issues && Array.isArray(source.issues)) {
+      source.issues.forEach(issue => {
+        allIssues.push({ ...issue, type })
+      })
+    }
+  }
+
+  collect(analysisResult.spelling, 'spelling')
+  collect(analysisResult.causality, 'causality')
+  collect(analysisResult.hate_bias, 'hate_bias')
+  collect(analysisResult.genre_cliche, 'cliche')
+  // Add other agents if needed
+
+  // Group issues by sentence_index
+  const issuesBySentence = {}
+  allIssues.forEach(issue => {
+    if (typeof issue.sentence_index === 'number') {
+      if (!issuesBySentence[issue.sentence_index]) {
+        issuesBySentence[issue.sentence_index] = []
+      }
+      issuesBySentence[issue.sentence_index].push(issue)
+    }
+  })
+
+  return (
+    <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
+      {sentences.map((sent, idx) => {
+        const sentIssues = issuesBySentence[idx] || []
+
+        // If no issues, return sentence as is (plus a space usually)
+        if (sentIssues.length === 0) {
+          return <span key={idx}>{sent} </span>
+        }
+
+        // Simple highlighting: just highlight the whole sentence if it has issues for now
+        // OR (Advanced): Split sentence by char_start/char_end.
+        // Let's do a simpler version first: Highlight specific ranges if non-overlapping.
+        // For robustness in this MVP, we'll sort issues by start char and try to highlight.
+
+        // Sort by start position
+        sentIssues.sort((a, b) => (a.char_start || 0) - (b.char_start || 0))
+
+        let lastIndex = 0
+        const fragments = []
+
+        sentIssues.forEach((issue, i) => {
+          const start = issue.char_start || 0
+          const end = issue.char_end || sent.length
+
+          if (start > lastIndex) {
+            fragments.push(<span key={`txt-${i}`}>{sent.slice(lastIndex, start)}</span>)
+          }
+
+          const color = ISSUE_COLORS[issue.type] || ISSUE_COLORS.default
+          const title = `${issue.type.toUpperCase()}: ${issue.reason || issue.suggestion || 'Issue found'}`
+
+          fragments.push(
+            <mark key={`iss-${i}`} style={{backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2}} title={title}>
+              {sent.slice(start, end)}
+            </mark>
+          )
+
+          lastIndex = end
+        })
+
+        if (lastIndex < sent.length) {
+          fragments.push(<span key={`end`}>{sent.slice(lastIndex)}</span>)
+        }
+
+        return (
+          <span key={idx} style={{marginRight: 4}}>
+            {fragments}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 function formatElapsed(sec) {
   const s = Math.max(0, Math.floor(sec || 0))
   const m = Math.floor(s / 60)
@@ -63,6 +164,14 @@ const TOAST_STYLES = {
   info: { borderColor: '#1976d2', background: 'rgba(25, 118, 210, 0.45)' },
   error: { borderColor: '#d32f2f', background: 'rgba(211, 47, 47, 0.45)' }
 }
+
+const PERSONA_LEGEND = [
+  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'causality', label: '개연성 에이전트' },
+  { key: 'hate_bias', label: '혐오·편향 에이전트' },
+  { key: 'cliche', label: '장르 클리셰 에이전트' },
+  { key: 'tension', label: '긴장도 에이전트' }
+]
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -102,6 +211,8 @@ export default function App() {
   //  download hover menu
   const [isDownloadOpen, setIsDownloadOpen] = useState(false)
   const downloadCloseTimer = useRef(null)
+  const [isLegendOpen, setIsLegendOpen] = useState(false)
+  const legendCloseTimer = useRef(null)
 
   function pushToast(message, variant = 'info') {
     const id = (toastIdRef.current += 1)
@@ -466,6 +577,20 @@ export default function App() {
   function onDownloadLeave() {
     downloadCloseTimer.current = setTimeout(() => {
       setIsDownloadOpen(false)
+    }, 180)
+  }
+
+  function onLegendEnter() {
+    if (legendCloseTimer.current) {
+      clearTimeout(legendCloseTimer.current)
+      legendCloseTimer.current = null
+    }
+    setIsLegendOpen(true)
+  }
+
+  function onLegendLeave() {
+    legendCloseTimer.current = setTimeout(() => {
+      setIsLegendOpen(false)
     }, 180)
   }
 
@@ -960,11 +1085,71 @@ export default function App() {
 
       {/* Center panel */}
       <div className="card scroll-hide" style={{padding:8, overflow:'auto', display:'flex', flexDirection:'column', gap:8}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
-          <div>
-            <div style={{fontSize:16, fontWeight:700}}>원고</div>
-            <div className="muted" style={{fontSize:12}}>
-              {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10}}>
+          <div style={{display:'flex', flexDirection:'column', gap:6}}>
+            <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
+              <div style={{fontSize:16, fontWeight:700, lineHeight:1}}>{activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}</div>
+            </div>
+            <div
+              onMouseEnter={onLegendEnter}
+              onMouseLeave={onLegendLeave}
+              style={{position: 'relative', display: 'inline-flex', alignItems: 'center'}}
+            >
+              <span style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#cfcfd6',
+                padding: '3px 8px',
+                borderRadius: 8,
+                border: '1px solid #2a2a2c',
+                background: '#16161a'
+              }}>
+                페르소나 구성
+              </span>
+
+              {isLegendOpen && (
+                <div
+                  className="card"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    left: 0,
+                    minWidth: 180,
+                    padding: 10,
+                    border: '2px solid #2a2a2c',
+                    background: '#0f0f12',
+                    zIndex: 60,
+                    boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
+                  }}
+                >
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#888',
+                    marginBottom: 8,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5
+                  }}>
+                    Agents by Color
+                  </div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                    {PERSONA_LEGEND.map(item => (
+                      <div key={item.key} style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                        <span style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 3,
+                          background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
+                          border: '1px solid #444'
+                        }} />
+                        <span className="mono" style={{fontSize: 12, color: '#cfcfd6'}}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1056,9 +1241,15 @@ export default function App() {
 
         <div className="scroll-hide" style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
           {activeDoc ? (
-            <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
-              {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
-            </pre>
+            activeAnalysis?.result?.split_sentences ? (
+               <div className="mono" style={{paddingBottom: 40}}>
+                 <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} />
+               </div>
+            ) : (
+              <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
+                {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
+              </pre>
+            )
           ) : (
             <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
           )}
@@ -1180,4 +1371,3 @@ export default function App() {
     </>
   )
 }
-
