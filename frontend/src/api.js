@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
 
 function getHeaders() {
   const token = localStorage.getItem('token');
@@ -41,16 +41,24 @@ export async function deleteDocument(id) {
   return request(`/documents/${id}`, { method: 'DELETE' });
 }
 
-export async function updateDocument(id, payload) {
-  return request(`/documents/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+export async function runAnalysis(docId, options = {}) {
+  const payload = {};
+  if (typeof options.personaCount === 'number') {
+    payload.persona_count = options.personaCount;
+  }
+  if (typeof options.creativeFocus === 'boolean') {
+    payload.creative_focus = options.creativeFocus;
+  }
+  const hasPayload = Object.keys(payload).length > 0;
+  return request(`/analysis/run/${docId}`, {
+    method: 'POST',
+    ...(hasPayload
+      ? {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      : {}),
   });
-}
-
-export async function runAnalysis(docId) {
-  return request(`/analysis/run/${docId}`, { method:'POST' });
 }
 
 export async function getAnalysis(id) {
