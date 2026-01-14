@@ -51,9 +51,9 @@ def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) 
         result["normalized_issues"] = normalized_issues
         result["highlights"] = highlights
 
-    if settings.enable_split_map:
-        result["split_sentences"] = split_payload.get("split_sentences")
-        result["split_map"] = split_payload.get("split_map")
+    # Always include split info for frontend highlighting
+    result["split_sentences"] = split_payload.get("split_sentences")
+    result["split_map"] = split_payload.get("split_map")
 
 
 async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
