@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+import logging
 
 from app.core.settings import get_settings
 from app.graph.graph import agent_app
@@ -19,6 +20,7 @@ from app.llm.client import has_upstage_api_key
 from app.services.split_map import build_split_payload
 from app.services.issue_normalizer import normalize_issues
 
+logger = logging.getLogger(__name__)
 
 @traceable(name="analysis_run", run_type="chain")
 async def run_analysis_for_text(
@@ -32,12 +34,14 @@ async def run_analysis_for_text(
     - 없으면 로컬 휴리스틱 fallback
     - 항상 동일한 출력 스키마 반환
     """
+    logger.info(f"[DEBUG] run_analysis_for_text started. Text len: {len(text)}, Mode: {mode}")
 
     if has_upstage_api_key():
         if mode == "full":
             return await _run_langgraph_full(text=text, context=context, mode=mode)
         return _run_causality_only(text=text, mode=mode)
-
+    
+    logger.info("[DEBUG] No UPSTAGE_API_KEY found. Running fallback.")
     return _run_fallback(text=text, mode=mode)
 
 
@@ -57,11 +61,18 @@ def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) 
 
 
 async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
+    logger.info("[DEBUG] _run_langgraph_full: Preparing initial state.")
     initial_state: AgentState = {
         "original_text": text,
         "context": context,
     }
-    final_state: AgentState = await agent_app.ainvoke(initial_state)
+    logger.info("[DEBUG] _run_langgraph_full: Invoking agent_app (LangGraph).")
+    try:
+        final_state: AgentState = await agent_app.ainvoke(initial_state)
+        logger.info("[DEBUG] _run_langgraph_full: agent_app returned successfully.")
+    except Exception as e:
+        logger.error(f"[DEBUG] _run_langgraph_full: agent_app failed with error: {e}")
+        raise e
 
     aggregated = final_state.get("aggregated_result") or {}
     decision = aggregated.get("decision")
@@ -109,22 +120,29 @@ async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> D
 
 
 def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
+    logger.info("[DEBUG] _run_causality_only: Starting.")
     split_agent = SplitAgent()
     causality_agent = CausalityEvaluatorAgent()
     aggregator = IssueBasedAggregatorAgent()
 
     try:
+        logger.info("[DEBUG] _run_causality_only: Running SplitAgent.")
         split_result = split_agent.run(text)
-    except Exception:
+        logger.info("[DEBUG] _run_causality_only: SplitAgent finished.")
+    except Exception as e:
+        logger.error(f"[DEBUG] _run_causality_only: SplitAgent failed: {e}")
         split_result = build_split_payload(text)
 
     causality = {}
     try:
+        logger.info("[DEBUG] _run_causality_only: Running CausalityEvaluatorAgent.")
         causality = causality_agent.run(
             split_result,
             reader_context=None,
         )
-    except Exception:
+        logger.info("[DEBUG] _run_causality_only: CausalityEvaluatorAgent finished.")
+    except Exception as e:
+        logger.error(f"[DEBUG] _run_causality_only: CausalityEvaluatorAgent failed: {e}")
         causality = {"issues": [], "error": "causality agent failed"}
 
     aggregate = aggregator.run(

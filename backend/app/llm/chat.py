@@ -1,9 +1,12 @@
 from app.llm.client import get_upstage_client
 from app.observability.langsmith import create_llm_run
+import logging
 
+logger = logging.getLogger(__name__)
 CHAT_MODEL = "solar-pro2"
 
 def chat(prompt: str, system: str | None = None, temperature: float = 0.2) -> str:
+    logger.info(f"[DEBUG] chat: Requesting chat completion. Prompt len: {len(prompt)}")
     client = get_upstage_client()
 
     messages = []
@@ -11,11 +14,17 @@ def chat(prompt: str, system: str | None = None, temperature: float = 0.2) -> st
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    res = client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=messages,
-        temperature=temperature,
-    )
+    try:
+        res = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=messages,
+            temperature=temperature,
+        )
+        logger.info("[DEBUG] chat: Chat completion request successful.")
+    except Exception as e:
+        logger.error(f"[DEBUG] chat: Chat completion request failed: {e}")
+        raise e
+
     usage = getattr(res, "usage", None)
     usage_payload = None
     if usage:
