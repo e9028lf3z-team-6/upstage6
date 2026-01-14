@@ -18,6 +18,10 @@
 - Python: 4칸 들여쓰기, PEP 8 네이밍(함수/모듈은 snake_case, 클래스는 CapWords). 로직은 `backend/app/...` 구조를 유지합니다.
 - JavaScript/React: 기존 스타일을 따르며(2칸 들여쓰기, 작은따옴표, 세미콜론 없음), 컴포넌트는 PascalCase, 훅은 `useX` 패턴을 사용합니다.
 
+## LLM/분석 주의사항
+- `backend/app/agents/tools/split_agent.py`는 대용량 텍스트에서 임베딩 호출이 실패하던 이슈를 피하려고 `embed_text` 호출을 제거했습니다. 다시 사용하려면 길이 제한/분할 처리 등 방어 로직을 추가하세요.
+- LLM 호출 로깅은 `backend/app/llm/chat.py`, `backend/app/llm/embedding.py`에서 길이/성공 여부만 기록합니다. 본문 내용을 로그로 남기지 마세요.
+
 ## 테스트 가이드라인
 - 자동화된 테스트가 아직 없습니다. 백엔드 테스트를 추가한다면 `backend/tests`에 `test_*.py`로 작성하고 pytest를 사용하세요.
 - 프런트엔드 테스트는 `frontend/src/__tests__`에 `*.test.jsx`로 추가하는 것을 권장합니다(React Testing Library 도입 시 명시).
