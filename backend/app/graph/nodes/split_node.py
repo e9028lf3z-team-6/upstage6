@@ -9,7 +9,7 @@ split_agent = SplitAgent()
 
 @traceable_timed(name="split")
 def split_node(state: AgentState) -> AgentState:
-    logger.info("[DEBUG] split_node: Starting.")
+    logger.info("[PROGRESS] 2/6 - 텍스트 분할 및 구조화 (Split) 수행 중...")
     result = split_agent.run(state["original_text"])
     logger.info("[DEBUG] split_node: Finished.")
 

@@ -12,7 +12,11 @@ load_dotenv(dotenv_path=ENV_PATH)
 from app.webapi.routes import router as api_router
 from app.core.settings import get_settings
 from app.core.db import init_db
+from app.core.logging import setup_logging
 from starlette.middleware.sessions import SessionMiddleware
+
+# Configure logging immediately
+setup_logging()
 
 
 def create_app() -> FastAPI:
