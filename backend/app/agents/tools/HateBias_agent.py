@@ -33,7 +33,7 @@ Do NOT include explanations or markdown.
         split_context = format_split_payload(split_payload)
 
         prompt = f"""
-다음은 글을 구조적으로 분리한 텍스트와 문장 목록이다.
+다음은 글의 문장 목록이다.
 
 너의 역할은 '혐오 및 편견 표현 탐지기'이다.
 
@@ -87,7 +87,7 @@ Do NOT include explanations or markdown.
 - char_start/end는 해당 문장 내 0-based 위치다.
 - quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
 
-분석 대상 텍스트:
+문장 목록:
 {split_context}
 """
 

@@ -39,7 +39,7 @@ Do NOT include explanations or markdown.
         split_context = format_split_payload(split_payload)
 
         prompt = f"""
-다음은 원고를 구조적으로 분리한 결과와 문장 목록이다.
+다음은 원고의 문장 목록이다.
 
 너의 역할은 '인과관계 분석가'이다.
 오직 사건 간 인과 연결만 보고, 인과가 끊기는 지점을 식별하라.
@@ -82,7 +82,7 @@ Do NOT include explanations or markdown.
 - char_start/end는 해당 문장 내 0-based 위치다.
 - quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
 
-구조 텍스트:
+문장 목록:
 {split_context}
 """
 
