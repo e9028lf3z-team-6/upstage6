@@ -11,6 +11,10 @@ import {
   uploadDocument
 } from './api.js'
 
+//  docx export
+// 설치: npm i docx
+import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx'
+
 function pretty(obj) {
   try { return JSON.stringify(obj, null, 2) } catch { return String(obj) }
 }
@@ -50,47 +54,63 @@ function makeTimestampName(prefix = 'note') {
   const h = pad2(d.getHours())
   const mi = pad2(d.getMinutes())
   const s = pad2(d.getSeconds())
-  return `${prefix}_${y}${mo}${da}_${h}${mi}${s}.txt`
+  return `${prefix}_${y}${mo}${da}_${h}${mi}${s}`
+}
+
+const TOAST_STYLES = {
+  success: { borderColor: '#2e7d32', background: 'rgba(46, 125, 50, 0.45)' },
+  warning: { borderColor: '#ed6c02', background: 'rgba(237, 108, 2, 0.45)' },
+  info: { borderColor: '#1976d2', background: 'rgba(25, 118, 210, 0.45)' },
+  error: { borderColor: '#d32f2f', background: 'rgba(211, 47, 47, 0.45)' }
 }
 
 export default function App() {
-  // Auth
   const [user, setUser] = useState(null)
 
-  // Docs/Analyses
   const [docs, setDocs] = useState([])
   const [activeDocId, setActiveDocId] = useState(null)
   const [activeDoc, setActiveDoc] = useState(null)
   const [analyses, setAnalyses] = useState([])
   const [activeAnalysis, setActiveAnalysis] = useState(null)
 
-  // UI states
   const [loading, setLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState(null)
 
-  //  Left panel mode: 'list' | 'upload' | 'settings'
+  // settings
+  const [personaCount, setPersonaCount] = useState(3)
+  const [creativeFocus, setCreativeFocus] = useState(true)
+
+  const [toasts, setToasts] = useState([])
+
   const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
 
   const fileRef = useRef(null)
   const uploaderFileRef = useRef(null)
+  const toastIdRef = useRef(0)
 
-  // right panel view: report | json
   const [rightView, setRightView] = useState('report')
 
-  // analyzing elapsed
   const [analysisElapsedSec, setAnalysisElapsedSec] = useState(0)
   const analysisTimerRef = useRef(null)
 
-  // 하단 텍스트 입력 + 저장
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
 
-  // -----------------------------
-  // Auth check and token parsing
-  // -----------------------------
+  //  download hover menu
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false)
+  const downloadCloseTimer = useRef(null)
+
+  function pushToast(message, variant = 'info') {
+    const id = (toastIdRef.current += 1)
+    setToasts(prev => [...prev, { id, message, variant }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 2400)
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')
@@ -118,9 +138,6 @@ export default function App() {
     setUser(null)
   }
 
-  // -----------------------------
-  // Docs refresh
-  // -----------------------------
   async function refreshDocs(pickFirstIfEmpty = true) {
     const items = await listDocuments()
     setDocs(items)
@@ -147,9 +164,6 @@ export default function App() {
     }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [activeDocId])
 
-  // -----------------------------
-  // 분석 중 타이머
-  // -----------------------------
   useEffect(() => {
     if (!isAnalyzing) {
       if (analysisTimerRef.current) {
@@ -171,9 +185,6 @@ export default function App() {
     }
   }, [isAnalyzing])
 
-  // -----------------------------
-  // 공통 업로드 함수 (input/drag&drop 공용)
-  // -----------------------------
   async function uploadOneFile(file) {
     if (!file) return
     setIsUploading(true)
@@ -184,14 +195,13 @@ export default function App() {
       await refreshDocs(false)
       setActiveDocId(doc.id)
 
-      // 업로드 화면 닫기(원래 화면으로)
       setLeftMode('list')
       setIsDragOver(false)
 
       if (fileRef.current) fileRef.current.value = ''
       if (uploaderFileRef.current) uploaderFileRef.current.value = ''
 
-      alert('업로드가 완료되었습니다.')
+      pushToast('업로드가 완료되었습니다.', 'success')
     } catch (e2) {
       setError(String(e2))
     } finally {
@@ -199,7 +209,6 @@ export default function App() {
     }
   }
 
-  // 기존 input 방식 (혹시 남겨둘 경우 대비)
   async function onUpload(e) {
     const f = e.target.files?.[0]
     if (!f) return
@@ -212,13 +221,10 @@ export default function App() {
     await uploadOneFile(f)
   }
 
-  // -----------------------------
-  // Save draft as .txt document
-  // -----------------------------
   async function onSaveDraft() {
     const text = (draftText ?? '').trim()
     if (!text) {
-      alert('저장할 텍스트를 입력하세요.')
+      pushToast('저장할 텍스트를 입력하세요.', 'warning')
       return
     }
 
@@ -228,14 +234,14 @@ export default function App() {
     try {
       const filename = makeTimestampName('draft')
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-      const file = new File([blob], filename, { type: 'text/plain' })
+      const file = new File([blob], `${filename}.txt`, { type: 'text/plain' })
 
       const doc = await uploadDocument(file)
       await refreshDocs(false)
       setActiveDocId(doc.id)
 
       setDraftText('')
-      alert('텍스트가 .txt 원고로 저장되었습니다.')
+      pushToast('텍스트가 .txt 원고로 저장되었습니다.', 'success')
     } catch (e2) {
       setError(String(e2))
     } finally {
@@ -243,9 +249,6 @@ export default function App() {
     }
   }
 
-  // -----------------------------
-  // Run analysis
-  // -----------------------------
   async function onRunAnalysis() {
     if (!activeDocId) return
 
@@ -253,13 +256,13 @@ export default function App() {
     setIsAnalyzing(true); setError(null)
 
     try {
-      const a = await runAnalysis(activeDocId)
+      const a = await runAnalysis(activeDocId, { personaCount, creativeFocus })
       const full = await getAnalysis(a.id)
       const list = await listAnalysesByDoc(activeDocId)
       setAnalyses(list)
       setActiveAnalysis(full)
       setRightView('report')
-      alert('분석이 완료되었습니다.')
+      pushToast('분석이 완료되었습니다.', 'success')
     } catch (e2) {
       setError(String(e2))
     } finally {
@@ -267,9 +270,6 @@ export default function App() {
     }
   }
 
-  // -----------------------------
-  // Delete doc / analysis
-  // -----------------------------
   async function onDeleteDoc(id) {
     if (!id) return
     const target = docs.find(x => x.id === id)
@@ -332,18 +332,12 @@ export default function App() {
     }
   }
 
-  // -----------------------------
-  // Derived values
-  // -----------------------------
   const readerLevel = activeAnalysis?.result?.final_metric?.reader_level
   const mode = activeAnalysis?.result?.debug?.mode || (activeAnalysis ? 'upstage_pipeline' : null)
   const reportMarkdown = activeAnalysis?.result?.report?.full_report_markdown
   const qaScores = activeAnalysis?.result?.qa_scores
   const canShowJson = !!activeAnalysis
 
-  // -----------------------------
-  // Left: upload panel handlers
-  // -----------------------------
   function openUploadPanel() {
     setLeftMode('upload')
     setIsDragOver(false)
@@ -351,7 +345,7 @@ export default function App() {
   }
 
   function openSettingsPanel() {
-    setLeftMode('settings')
+    setLeftMode(prev => (prev === 'settings' ? 'list' : 'settings'))
     setIsDragOver(false)
     setError(null)
   }
@@ -385,17 +379,10 @@ export default function App() {
     await uploadOneFile(file)
   }
 
-  // -----------------------------
-  //  Settings Button (bottom-right inside red box)
-  // -----------------------------
   function SettingsIcon() {
     return (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-        />
+        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
         <path
           d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
           stroke="currentColor"
@@ -406,10 +393,139 @@ export default function App() {
     )
   }
 
-  return (
-    <div style={{display:'grid', gridTemplateColumns:'320px 1fr 520px', height:'100vh', gap:12, padding:12}}>
+  // toggle sizes
+  const SWITCH_W = 44
+  const SWITCH_H = 24
+  const SWITCH_PAD = 3
+  const KNOB = SWITCH_H - SWITCH_PAD * 2
+  const KNOB_TRAVEL = SWITCH_W - SWITCH_PAD * 2 - KNOB
 
-      {/* QA Scores Floating Box */}
+  // -----------------------------
+  //  Front-only download helpers
+  // -----------------------------
+  const docTitleBase =
+    (activeDoc?.title || activeDoc?.filename || 'document')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .slice(0, 80)
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1200)
+  }
+
+  function exportAsTxt() {
+    const text = (activeDoc?.extracted_text || '').trim()
+    if (!text) {
+      pushToast('내보낼 텍스트가 없습니다.', 'warning')
+      return
+    }
+    const filename = `${docTitleBase}_${makeTimestampName('export')}.txt`
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    downloadBlob(blob, filename)
+    pushToast('txt로 저장했습니다.', 'success')
+  }
+
+  async function exportAsDocx() {
+    const text = (activeDoc?.extracted_text || '').trim()
+    if (!text) {
+      pushToast('내보낼 텍스트가 없습니다.', 'warning')
+      return
+    }
+
+    const lines = text.split(/\r?\n/)
+    const paragraphs = lines.map(line =>
+      new Paragraph({
+        children: [new TextRun({ text: line || ' ' })]
+      })
+    )
+
+    const doc = new DocxDocument({
+      sections: [{ children: paragraphs }]
+    })
+
+    const blob = await Packer.toBlob(doc)
+    const filename = `${docTitleBase}_${makeTimestampName('export')}.docx`
+    downloadBlob(blob, filename)
+    pushToast('docx로 저장했습니다.', 'success')
+  }
+
+  function onDownloadEnter() {
+    if (downloadCloseTimer.current) {
+      clearTimeout(downloadCloseTimer.current)
+      downloadCloseTimer.current = null
+    }
+    setIsDownloadOpen(true)
+  }
+
+  function onDownloadLeave() {
+    downloadCloseTimer.current = setTimeout(() => {
+      setIsDownloadOpen(false)
+    }, 180)
+  }
+
+  return (
+    <>
+      <style>{`
+        body {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        body::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+        }
+        .scroll-hide {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .scroll-hide::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+        }
+      `}</style>
+      <div className="scroll-hide" style={{display:'grid', gridTemplateColumns:'300px 1fr 480px', height:'100vh', gap:8}}>
+      {/* Toast notifications */}
+      {toasts.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 24,
+          right: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          zIndex: 1200,
+          pointerEvents: 'none'
+        }}>
+          {toasts.map(t => {
+            const style = TOAST_STYLES[t.variant] || TOAST_STYLES.info
+            return (
+              <div
+                key={t.id}
+                style={{
+                  border: `1px solid ${style.borderColor}`,
+                  background: style.background,
+                  color: '#e6e6ea',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  minWidth: 220,
+                  fontSize: 13,
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.35)'
+                }}
+              >
+                {t.message}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Floating QA score widget */}
       {qaScores && Object.keys(qaScores).length > 0 && (
         <div style={{
           position: 'fixed',
@@ -453,18 +569,9 @@ export default function App() {
         </div>
       )}
 
-      {/* Left */}
-      <div
-        className="card"
-        style={{
-          padding:12,
-          overflow:'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0
-        }}
-      >
-        {/* User Profile Section */}
+      {/* Left panel */}
+      <div className="card" style={{padding:8, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0}}>
+        {/* User Profile */}
         <div style={{marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid #333'}}>
           {user ? (
             <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
@@ -512,15 +619,11 @@ export default function App() {
             <div className="muted" style={{fontSize:12}}>PDF/DOCX/HWP 업로드</div>
           </div>
 
-          {/* 업로드 버튼: 누르면 파란 영역이 (upload/settings)로 바뀜 */}
           <button
             className="btn"
             onClick={openUploadPanel}
             disabled={isUploading}
-            style={{
-              opacity: isUploading ? 0.7 : 1,
-              cursor: isUploading ? 'not-allowed' : 'pointer',
-            }}
+            style={{opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer'}}
             title={isUploading ? '업로드 중…' : '내부 저장소 업로드'}
           >
             업로드
@@ -544,24 +647,21 @@ export default function App() {
           {isSavingDraft && <Badge>saving…</Badge>}
         </div>
 
-        {/* (스크롤 영역) */}
-        <div style={{marginTop:14, flex: 1, minHeight: 0, overflow:'auto', paddingBottom:12}}>
+        {/* scroll area */}
+        <div className="scroll-hide" style={{marginTop:14, flex:1, minHeight:0, overflow:'auto', paddingBottom:12}}>
+          {/* Upload panel */}
           {leftMode === 'upload' && (
             <div>
-              {/* 내부 저장소 헤더 */}
-              <div
-                className="card"
-                style={{
-                  padding: 12,
-                  border: '1px solid #2a2a2c',
-                  background: 'rgba(46, 125, 50, 0.18)',
-                  marginBottom: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10
-                }}
-              >
+              <div className="card" style={{
+                padding: 12,
+                border: '3px solid #2a2a2c',
+                background: 'rgba(46, 125, 50, 0.18)',
+                marginBottom: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10
+              }}>
                 <div>
                   <div style={{fontWeight: 800, fontSize: 16}}>내부저장소</div>
                   <div className="muted" style={{fontSize: 12, marginTop: 4}}>
@@ -569,7 +669,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/*  되돌리기 버튼 */}
                 <button
                   className="btn"
                   onClick={closeLeftPanelToList}
@@ -579,19 +678,16 @@ export default function App() {
                     cursor: isUploading ? 'not-allowed' : 'pointer',
                     width: 100,
                     height: 42,
-
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-
                   }}
                   title="되돌아오기"
                 >
-                 되돌리기
+                  돌아가기
                 </button>
               </div>
 
-              {/* Drag & Drop Zone */}
               <div
                 className="card"
                 onDragOver={onDragOver}
@@ -599,7 +695,7 @@ export default function App() {
                 onDrop={onDrop}
                 style={{
                   padding: 14,
-                  border: `1px dashed ${isDragOver ? '#6aa9ff' : '#2a2a2c'}`,
+                  border: `3px dashed ${isDragOver ? '#6aa9ff' : '#2a2a2c'}`,
                   background: isDragOver ? 'rgba(50, 100, 200, 0.22)' : 'rgba(50, 100, 200, 0.12)',
                   minHeight: 220,
                   display: 'flex',
@@ -649,64 +745,131 @@ export default function App() {
             </div>
           )}
 
+          {/* Settings panel */}
           {leftMode === 'settings' && (
             <div>
-              {/*  설정 화면 (빈칸) + 되돌리기 버튼: 오른쪽 상단 */}
-              <div
-                className="card"
-                style={{
-                  padding: 12,
-                  border: '1px solid #2a2a2c',
-                  background: '#141417',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10
-                }}
-              >
+              <div className="card" style={{
+                padding: 12,
+                border: '3px solid #2a2a2c',
+                background: '#141417',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10
+              }}>
                 <div>
                   <div style={{fontWeight: 800, fontSize: 16}}>설정</div>
                   <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                     설정 내용은 나중에 추가할 것
                   </div>
                 </div>
-
-                <button
-                  className="btn"
-                  onClick={closeLeftPanelToList}
-                  style={{opacity: isUploading ? 0.7 : 1,
-                          cursor: isUploading ? 'not-allowed' : 'pointer',
-                          width: 100,
-                          height: 42,
-
-                          display: 'flex',
-                          alignItems: 'center',      //  핵심
-                          justifyContent: 'center',}}
-                  title="되돌리기"
-                >
-                  되돌리기
-                </button>
               </div>
 
-              {/* 빈 설정 내용 영역 */}
-              <div
-                className="card"
-                style={{
-                  marginTop: 10,
-                  padding: 14,
-                  minHeight: 320,
-                  border: '1px solid #2a2a2c',
-                  background: '#0f0f12'
-                }}
-              >
-                {/* intentionally empty */}
+              <div className="card" style={{
+                marginTop: 10,
+                padding: 14,
+                minHeight: 320,
+                border: '3px solid #2a2a2c',
+                background: '#0f0f12'
+              }}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: 18}}>
+
+                  <div style={{display:'flex', flexDirection:'column', gap: 10}}>
+                    <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', gap: 10}}>
+                      <div>
+                        <div style={{fontWeight: 800, fontSize: 16}}>페르소나 갯수</div>
+                        <div className="muted" style={{fontSize: 12}}>1(디폴트 3) 최대 5</div>
+                      </div>
+                      <span className="mono" style={{
+                        padding: '4px 10px',
+                        borderRadius: 10,
+                        border: '1px solid #2a2a2c',
+                        background: '#141417',
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: '#e6e6ea',
+                        minWidth: 44,
+                        textAlign: 'center'
+                      }}>
+                        {personaCount}명
+                      </span>
+                    </div>
+
+                    <div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={5}
+                        step={1}
+                        value={personaCount}
+                        onChange={(e) => setPersonaCount(Number(e.target.value))}
+                        style={{width: '100%', boxSizing: 'border-box', padding: 0}}
+                      />
+                      <div style={{display:'flex', justifyContent:'space-between', marginTop: 6}}>
+                        <span className="muted" style={{fontSize: 11}}>1</span>
+                        <span className="muted" style={{fontSize: 11}}>5</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 12}}>
+                    <div>
+                      <div style={{fontWeight: 800, fontSize: 16}}>집중 모드</div>
+                      <div className="muted" style={{fontSize: 12}}>창의성 ↔ 직관성</div>
+                    </div>
+
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => setCreativeFocus(prev => !prev)}
+                      aria-pressed={creativeFocus}
+                      style={{
+                        minWidth: 150,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        padding: '6px 10px'
+                      }}
+                    >
+                      <span style={{fontSize: 12, fontWeight: 800}}>
+                        {creativeFocus ? '창의성 중심' : '직관성'}
+                      </span>
+
+                      <span aria-hidden="true" style={{
+                        width: SWITCH_W,
+                        height: SWITCH_H,
+                        borderRadius: 999,
+                        background: creativeFocus ? '#66bb6a' : '#555',
+                        position: 'relative',
+                        display: 'inline-block',
+                        padding: SWITCH_PAD,
+                        boxSizing: 'border-box',
+                        transition: 'background 0.18s ease',
+                        border: '1px solid #2a2a2c'
+                      }}>
+                        <span style={{
+                          width: KNOB,
+                          height: KNOB,
+                          borderRadius: '50%',
+                          background: '#0f0f12',
+                          display: 'block',
+                          transform: creativeFocus ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
+                          transition: 'transform 0.18s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
+                        }} />
+                      </span>
+                    </button>
+                  </div>
+
+                </div>
               </div>
             </div>
           )}
 
+          {/* List panel */}
           {leftMode === 'list' && (
             <>
-              {/* 원고 목록 */}
               <div className="muted" style={{fontSize:12, marginBottom:8}}>원고 목록</div>
               {docs.map(d => (
                 <div key={d.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
@@ -735,7 +898,6 @@ export default function App() {
                 </div>
               ))}
 
-              {/* 분석 기록 */}
               <div style={{marginTop:18}}>
                 <div className="muted" style={{fontSize:12, marginBottom:8}}>분석 기록</div>
                 {analyses.length === 0 && <div className="muted" style={{fontSize:13}}>아직 분석이 없습니다.</div>}
@@ -765,7 +927,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Error (Left에도 표시) */}
+        {/* Error banner */}
         {error && (
           <div className="card" style={{marginTop:12, padding:12, borderColor:'#5a2a2a', background:'#1a0f10'}}>
             <div style={{fontWeight:700, marginBottom:6}}>Error</div>
@@ -773,42 +935,31 @@ export default function App() {
           </div>
         )}
 
-        {/* 하단 바 + 오른쪽에 설정 버튼 */}
-        <div
-          style={{
-            marginTop: 12,
-            paddingTop: 10,
-            borderTop: '1px solid #333',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 10
-          }}
-        >
-          <div className="muted" style={{fontSize: 12}}>
-            {/* 왼쪽 하단은 일단 비워둠 */}
-          </div>
-
+        {/* bottom bar */}
+        <div style={{
+          marginTop: 12,
+          paddingTop: 10,
+          borderTop: '1px solid #333',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10
+        }}>
+          <div className="muted" style={{fontSize: 12}} />
           <button
             className="btn"
             onClick={openSettingsPanel}
             disabled={isUploading}
             title="설정"
-            style={{
-              width: 52,
-              height: 46,
-              display: 'grid',
-              placeItems: 'center',
-              padding: 0
-            }}
+            style={{width: 52, height: 46, display: 'grid', placeItems: 'center', padding: 0}}
           >
             <SettingsIcon />
           </button>
         </div>
       </div>
 
-      {/* Center */}
-      <div className="card" style={{padding:12, overflow:'auto', display:'flex', flexDirection:'column', gap:12}}>
+      {/* Center panel */}
+      <div className="card scroll-hide" style={{padding:8, overflow:'auto', display:'flex', flexDirection:'column', gap:8}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
           <div>
             <div style={{fontSize:16, fontWeight:700}}>원고</div>
@@ -817,26 +968,93 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4}}>
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
-              {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
+          {/*  실행 버튼 조금 왼쪽 + 내보내기 hover 메뉴 */}
+          <div style={{display:'flex', alignItems:'center', gap:10, marginRight: 8}}>
+            {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
+
+            <button
+              className="btn"
+              onClick={onRunAnalysis}
+              disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
+              style={{
+                opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
+                cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
+                marginRight: 6
+              }}
+            >
+              {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+            </button>
+
+            <div
+              onMouseEnter={onDownloadEnter}
+              onMouseLeave={onDownloadLeave}
+              style={{ position: 'relative' }}
+            >
               <button
                 className="btn"
-                onClick={onRunAnalysis}
-                disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
+                type="button"
+                disabled={!activeDoc}
                 style={{
-                  opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
-                  cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
+                  opacity: !activeDoc ? 0.6 : 1,
+                  cursor: !activeDoc ? 'not-allowed' : 'pointer',
+                  paddingLeft: 12,
+                  paddingRight: 12
                 }}
+                title="내보내기"
               >
-                {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+                내보내기
               </button>
+
+              {isDownloadOpen && activeDoc && (
+                <div
+                  className="card"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    minWidth: 180,
+                    padding: 8,
+                    border: '2px solid #2a2a2c',
+                    background: '#0f0f12',
+                    zIndex: 50,
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
+                  }}
+                >
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => { setIsDownloadOpen(false); exportAsTxt() }}
+                    style={{
+                      width: '100%',
+                      justifyContent: 'flex-start',
+                      textAlign: 'left',
+                      marginBottom: 6
+                    }}
+                  >
+                    txt로 내보내기
+                  </button>
+
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => { setIsDownloadOpen(false); exportAsDocx() }}
+                    style={{
+                      width: '100%',
+                      justifyContent: 'flex-start',
+                      textAlign: 'left'
+                    }}
+                  >
+                    docx로 내보내기
+                  </button>
+                </div>
+              )}
             </div>
-            {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
           </div>
         </div>
 
-        <div style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
+        {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
+
+        <div className="scroll-hide" style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
           {activeDoc ? (
             <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
               {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
@@ -846,8 +1064,8 @@ export default function App() {
           )}
         </div>
 
-        {/* 하단 텍스트 입력 */}
-        <div className="card" style={{padding:12, background:'#141417', border:'1px solid #2a2a2c'}}>
+        {/* Draft input */}
+        <div className="card" style={{padding:12, background:'#141417', border:'3px solid #2a2a2c'}}>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:8}}>
             <div style={{fontWeight:700}}>텍스트 입력</div>
             <button
@@ -889,8 +1107,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Right */}
-      <div className="card" style={{padding:12, overflow:'auto'}}>
+      {/* Right panel */}
+      <div className="card scroll-hide" style={{padding:8, overflow:'auto'}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
           <div>
             <div style={{fontSize:16, fontWeight:700}}>분석 결과</div>
@@ -959,5 +1177,7 @@ export default function App() {
         )}
       </div>
     </div>
+    </>
   )
 }
+
