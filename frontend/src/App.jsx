@@ -35,26 +35,120 @@ function Badge({ children }) {
 }
 
 const ISSUE_COLORS = {
-  spelling: 'rgba(239, 83, 80, 0.4)',     // Red for spelling
-  causality: 'rgba(255, 202, 40, 0.4)',   // Amber for logic/causality
-  hate_bias: 'rgba(171, 71, 188, 0.4)',   // Purple for ethical/bias
-  cliche: 'rgba(66, 165, 245, 0.4)',      // Blue for cliches
-  tension: 'rgba(255, 112, 67, 0.4)',     // Orange for tension
-  default: 'rgba(158, 158, 158, 0.4)'
+  tone: 'rgba(0, 150, 136, 0.4)',
+  logic: 'rgba(255, 202, 40, 0.4)',
+  causality: 'rgba(255, 202, 40, 0.4)',
+  trauma: 'rgba(239, 83, 80, 0.45)',
+  hate_bias: 'rgba(171, 71, 188, 0.4)',
+  genre_cliche: 'rgba(66, 165, 245, 0.4)',
+  cliche: 'rgba(66, 165, 245, 0.4)',
+  spelling: 'rgba(239, 83, 80, 0.3)',
+  tension: 'rgba(255, 112, 67, 0.4)',
+  default: 'rgba(158, 158, 158, 0.35)'
 }
 
 function HighlightedText({ text, analysisResult }) {
-  // If no detailed analysis data, just show text
+  const rawHighlights = Array.isArray(analysisResult?.highlights) ? analysisResult.highlights : []
+  const rawNormalized = Array.isArray(analysisResult?.normalized_issues) ? analysisResult.normalized_issues : []
+  const hasDocHighlights = rawHighlights.length > 0 || rawNormalized.length > 0
+
+  if (hasDocHighlights && typeof text === 'string') {
+    const textLen = text.length
+    const severityRank = { high: 3, medium: 2, low: 1 }
+
+    const highlightItems = []
+    const sourceItems = rawHighlights.length > 0
+      ? rawHighlights.map(item => ({
+        agent: item.agent,
+        severity: item.severity,
+        label: item.label || item.issue_type,
+        reason: item.reason,
+        doc_start: item.doc_start,
+        doc_end: item.doc_end
+      }))
+      : rawNormalized.map(item => ({
+        agent: item.agent,
+        severity: item.severity,
+        label: item.issue_type,
+        reason: item.reason,
+        doc_start: item.location?.doc_start,
+        doc_end: item.location?.doc_end
+      }))
+
+    sourceItems.forEach(item => {
+      const start = Number.isFinite(item.doc_start)
+        ? Math.max(0, Math.min(textLen, Math.floor(item.doc_start)))
+        : null
+      const end = Number.isFinite(item.doc_end)
+        ? Math.max(0, Math.min(textLen, Math.floor(item.doc_end)))
+        : null
+      if (start === null || end === null || end <= start) return
+      highlightItems.push({ ...item, start, end })
+    })
+
+    if (highlightItems.length === 0) {
+      return <div style={{whiteSpace:'pre-wrap', lineHeight:1.6}}>{text}</div>
+    }
+
+    const boundaries = new Set([0, textLen])
+    highlightItems.forEach(item => {
+      boundaries.add(item.start)
+      boundaries.add(item.end)
+    })
+    const points = Array.from(boundaries).sort((a, b) => a - b)
+
+    const segments = []
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const start = points[i]
+      const end = points[i + 1]
+      if (end <= start) continue
+      const segmentText = text.slice(start, end)
+      const issues = highlightItems.filter(item => item.start < end && item.end > start)
+      segments.push({ start, end, text: segmentText, issues })
+    }
+
+    return (
+      <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
+        {segments.map(segment => {
+          if (!segment.issues.length) {
+            return <span key={`${segment.start}-${segment.end}`}>{segment.text}</span>
+          }
+
+          const sortedIssues = [...segment.issues].sort((a, b) => {
+            const rankDiff = (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0)
+            if (rankDiff !== 0) return rankDiff
+            return String(a.agent || '').localeCompare(String(b.agent || ''))
+          })
+          const primary = sortedIssues[0]
+          const color = ISSUE_COLORS[primary.agent] || ISSUE_COLORS.default
+          const title = sortedIssues.map(issue => {
+            const agent = issue.agent || 'unknown'
+            const severity = issue.severity ? ` (${issue.severity})` : ''
+            const label = issue.label || 'issue'
+            const reason = issue.reason ? ` - ${issue.reason}` : ''
+            return `${agent}${severity}: ${label}${reason}`
+          }).join('\n')
+
+          return (
+            <mark
+              key={`${segment.start}-${segment.end}`}
+              style={{backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2}}
+              title={title}
+            >
+              {segment.text}
+            </mark>
+          )
+        })}
+      </div>
+    )
+  }
+
   if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
     return <div style={{whiteSpace:'pre-wrap', lineHeight:1.6}}>{text}</div>
   }
 
   const sentences = analysisResult.split_sentences
-
-  // Aggregate all issues from different agents
-  let allIssues = []
-
-  // Helper to collect issues
+  const allIssues = []
   const collect = (source, type) => {
     if (source?.issues && Array.isArray(source.issues)) {
       source.issues.forEach(issue => {
@@ -63,13 +157,18 @@ function HighlightedText({ text, analysisResult }) {
     }
   }
 
-  collect(analysisResult.spelling, 'spelling')
-  collect(analysisResult.causality, 'causality')
+  const logicSource = analysisResult.logic || analysisResult.causality
+  if (logicSource) {
+    collect(logicSource, analysisResult.logic ? 'logic' : 'causality')
+  }
+  collect(analysisResult.tone, 'tone')
+  collect(analysisResult.trauma, 'trauma')
   collect(analysisResult.hate_bias, 'hate_bias')
-  collect(analysisResult.genre_cliche, 'cliche')
-  // Add other agents if needed
+  collect(analysisResult.genre_cliche, 'genre_cliche')
+  collect(analysisResult.cliche, 'cliche')
+  collect(analysisResult.spelling, 'spelling')
+  collect(analysisResult.tension_curve || analysisResult.tension, 'tension')
 
-  // Group issues by sentence_index
   const issuesBySentence = {}
   allIssues.forEach(issue => {
     if (typeof issue.sentence_index === 'number') {
@@ -84,18 +183,10 @@ function HighlightedText({ text, analysisResult }) {
     <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
-
-        // If no issues, return sentence as is (plus a space usually)
         if (sentIssues.length === 0) {
           return <span key={idx}>{sent} </span>
         }
 
-        // Simple highlighting: just highlight the whole sentence if it has issues for now
-        // OR (Advanced): Split sentence by char_start/char_end.
-        // Let's do a simpler version first: Highlight specific ranges if non-overlapping.
-        // For robustness in this MVP, we'll sort issues by start char and try to highlight.
-
-        // Sort by start position
         sentIssues.sort((a, b) => (a.char_start || 0) - (b.char_start || 0))
 
         let lastIndex = 0
