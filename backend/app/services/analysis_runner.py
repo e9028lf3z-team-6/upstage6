@@ -70,8 +70,15 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
     tension = final_state.get("tension_curve_result")
 
     split_payload = final_state.get("split_text") or {}
-    if not isinstance(split_payload, dict):
-        split_payload = {"split_text": split_payload}
+    if isinstance(split_payload, list):
+        split_payload = {
+            "split_sentences": [str(item) for item in split_payload],
+            "split_map": [],
+        }
+    elif isinstance(split_payload, str):
+        split_payload = build_split_payload(split_payload)
+    elif not isinstance(split_payload, dict):
+        split_payload = {}
 
     result = {
         "split": split_payload,
@@ -268,11 +275,7 @@ def _run_qa_scores(text: str, outputs: Dict[str, Any], mode: str) -> Dict[str, i
 
 
 def _split_text(text: str) -> dict:
-    chunks = [c.strip() for c in text.split("\n\n") if c.strip()]
-    if not chunks:
-        chunks = [text.strip()]
-    summary = "\n\n".join(chunks[:5])
-    return build_split_payload(text, summary=summary)
+    return build_split_payload(text)
 
 
 def _heuristic_tone(text: str) -> dict:

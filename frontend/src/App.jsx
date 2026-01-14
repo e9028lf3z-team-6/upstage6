@@ -8,6 +8,7 @@ import {
   listAnalysesByDoc,
   listDocuments,
   runAnalysis,
+  updateDocument,
   uploadDocument
 } from './api.js'
 
@@ -140,6 +141,94 @@ function renderHighlightedText(text, highlights, issueReasonMap) {
   return parts
 }
 
+function computeEditDelta(prevText, nextText) {
+  if (prevText === nextText) return null
+  const prevLen = prevText.length
+  const nextLen = nextText.length
+  let start = 0
+  while (start < prevLen && start < nextLen && prevText[start] === nextText[start]) {
+    start += 1
+  }
+  let prevEnd = prevLen - 1
+  let nextEnd = nextLen - 1
+  while (prevEnd >= start && nextEnd >= start && prevText[prevEnd] === nextText[nextEnd]) {
+    prevEnd -= 1
+    nextEnd -= 1
+  }
+  const prevChangedEnd = prevEnd + 1
+  const nextChangedEnd = nextEnd + 1
+  return {
+    start,
+    prevChangedEnd,
+    nextChangedEnd,
+    delta: nextLen - prevLen
+  }
+}
+
+function applyEditToHighlights(highlights, prevText, nextText) {
+  if (!Array.isArray(highlights) || highlights.length === 0) return []
+  const deltaInfo = computeEditDelta(prevText, nextText)
+  if (!deltaInfo) return highlights
+  const { start, prevChangedEnd, delta } = deltaInfo
+  const updated = []
+
+  highlights.forEach((item) => {
+    const rawStart = typeof item.doc_start === 'number' ? item.doc_start : item.start
+    const rawEnd = typeof item.doc_end === 'number' ? item.doc_end : item.end
+    if (typeof rawStart !== 'number' || typeof rawEnd !== 'number') return
+    if (rawEnd <= start) {
+      updated.push({ ...item, doc_start: rawStart, doc_end: rawEnd })
+      return
+    }
+    if (rawStart >= prevChangedEnd) {
+      updated.push({ ...item, doc_start: rawStart + delta, doc_end: rawEnd + delta })
+      return
+    }
+    if (rawStart < start) {
+      updated.push({ ...item, doc_start: rawStart, doc_end: start })
+    }
+    if (rawEnd > prevChangedEnd) {
+      updated.push({
+        ...item,
+        doc_start: prevChangedEnd + delta,
+        doc_end: rawEnd + delta
+      })
+    }
+  })
+
+  return updated.filter(h => h.doc_end > h.doc_start)
+}
+
+function attachHighlightReasons(highlights, issueReasonMap) {
+  if (!Array.isArray(highlights) || highlights.length === 0) return highlights || []
+  return highlights.map((item) => {
+    const start = item?.doc_start
+    const end = item?.doc_end
+    if (typeof start !== 'number' || typeof end !== 'number') return item
+    const key = `${start}:${end}:${item.agent || ''}`
+    const reason = issueReasonMap?.[key]
+    if (!reason) return item
+    return { ...item, reason }
+  })
+}
+
+function parseDateValue(value) {
+  if (!value) return null
+  const direct = new Date(value)
+  if (!Number.isNaN(direct.getTime())) return direct
+  const normalized = String(value).replace(' ', 'T')
+  const fallback = new Date(normalized)
+  if (!Number.isNaN(fallback.getTime())) return fallback
+  return null
+}
+
+function isAnalysisStale(analysis, docUpdatedAt) {
+  const docDate = parseDateValue(docUpdatedAt)
+  const analysisDate = parseDateValue(analysis?.created_at)
+  if (!docDate || !analysisDate) return false
+  return docDate > analysisDate
+}
+
 export default function App() {
   // Auth
   const [user, setUser] = useState(null)
@@ -163,6 +252,16 @@ export default function App() {
 
   const fileRef = useRef(null)
   const uploaderFileRef = useRef(null)
+
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [docHighlights, setDocHighlights] = useState(null)
+  const editPrevTextRef = useRef('')
+  const editHighlightsRef = useRef([])
+  const editorAreaRef = useRef(null)
+  const editorHighlightRef = useRef(null)
 
   // right panel view: report | json
   const [rightView, setRightView] = useState('report')
@@ -236,6 +335,15 @@ export default function App() {
     }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [activeDocId])
 
+  useEffect(() => {
+    setIsEditing(false)
+    setEditText('')
+    setIsSavingEdit(false)
+    setDocHighlights(null)
+    editPrevTextRef.current = ''
+    editHighlightsRef.current = []
+  }, [activeDocId])
+
   // -----------------------------
   // 분석 중 타이머
   // -----------------------------
@@ -259,6 +367,12 @@ export default function App() {
       }
     }
   }, [isAnalyzing])
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDocHighlights(null)
+    }
+  }, [activeAnalysis?.id])
 
   // -----------------------------
   //  공통 업로드 함수 (input/drag&drop 공용)
@@ -331,6 +445,74 @@ export default function App() {
       setError(String(e2))
     } finally {
       setIsSavingDraft(false)
+    }
+  }
+
+  function startEditing() {
+    if (!activeDoc) return
+    const baseText = activeDoc.extracted_text || ''
+    const baseHighlights = attachHighlightReasons(rawHighlights || [], issueReasonMap)
+    editPrevTextRef.current = baseText
+    editHighlightsRef.current = baseHighlights
+    setEditText(baseText)
+    setDocHighlights(baseHighlights)
+    setIsEditing(true)
+  }
+
+  function cancelEditing() {
+    setIsEditing(false)
+    setEditText('')
+    setDocHighlights(null)
+    editPrevTextRef.current = ''
+    editHighlightsRef.current = []
+  }
+
+  function onEditTextChange(e) {
+    const nextText = e.target.value
+    const prevText = editPrevTextRef.current
+    const prevHighlights = editHighlightsRef.current
+    const updatedHighlights = applyEditToHighlights(prevHighlights, prevText, nextText)
+    editPrevTextRef.current = nextText
+    editHighlightsRef.current = updatedHighlights
+    setEditText(nextText)
+    setDocHighlights(updatedHighlights)
+  }
+
+  function syncEditorScroll(e) {
+    if (!editorHighlightRef.current) return
+    editorHighlightRef.current.scrollTop = e.target.scrollTop
+    editorHighlightRef.current.scrollLeft = e.target.scrollLeft
+  }
+
+  async function onSaveEdits() {
+    if (!activeDoc) return
+    if ((editText || '') === (activeDoc.extracted_text || '')) {
+      cancelEditing()
+      return
+    }
+
+    setIsSavingEdit(true)
+    setError(null)
+
+    try {
+      const updated = await updateDocument(activeDoc.id, {
+        extracted_text: editText,
+        title: activeDoc.title
+      })
+      setActiveDoc(updated)
+      setDocs(prev => prev.map(d => (
+        d.id === updated.id
+          ? { ...d, title: updated.title, updated_at: updated.updated_at }
+          : d
+      )))
+      editPrevTextRef.current = updated.extracted_text || ''
+      setIsEditing(false)
+      setDocHighlights(editHighlightsRef.current)
+      alert('원고가 업데이트되었습니다.')
+    } catch (e2) {
+      setError(String(e2))
+    } finally {
+      setIsSavingEdit(false)
     }
   }
 
@@ -434,11 +616,25 @@ export default function App() {
   const rawHighlights = activeAnalysis?.result?.highlights
   const normalizedIssues = activeAnalysis?.result?.normalized_issues
   const issueReasonMap = buildIssueReasonMap(normalizedIssues)
+  const baseHighlights = attachHighlightReasons(rawHighlights || [], issueReasonMap)
+  const highlightSource = docHighlights !== null ? docHighlights : baseHighlights
+  const editorHighlights = isEditing ? (docHighlights || baseHighlights) : highlightSource
+  const originalHighlights = baseHighlights
   const highlightFilter = user ? null : new Set(['logic', 'causality'])
-  const filteredHighlights = normalizeHighlights(
-    (rawHighlights || []).filter(h => !highlightFilter || highlightFilter.has(h.agent)),
+  const filteredEditorHighlights = normalizeHighlights(
+    (editorHighlights || []).filter(h => !highlightFilter || highlightFilter.has(h.agent)),
+    (editText || '').length
+  )
+  const filteredOriginalHighlights = normalizeHighlights(
+    (originalHighlights || []).filter(h => !highlightFilter || highlightFilter.has(h.agent)),
     (activeDoc?.extracted_text || '').length
   )
+  const displayTextLength = isEditing ? (editText || '').length : (activeDoc?.extracted_text || '').length
+  const filteredHighlights = normalizeHighlights(
+    (highlightSource || []).filter(h => !highlightFilter || highlightFilter.has(h.agent)),
+    displayTextLength
+  )
+  const activeAnalysisStale = activeAnalysis && isAnalysisStale(activeAnalysis, activeDoc?.updated_at)
 
   // -----------------------------
   // Upload panel handlers
@@ -735,27 +931,32 @@ export default function App() {
             <div style={{marginTop:18}}>
               <div className="muted" style={{fontSize:12, marginBottom:8}}>분석 기록</div>
               {analyses.length === 0 && <div className="muted" style={{fontSize:13}}>아직 분석이 없습니다.</div>}
-              {analyses.map(a => (
-                <div key={a.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
-                  <button className="btn" onClick={() => openAnalysis(a.id)} style={{flex:1, textAlign:'left'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', gap:10}}>
-                      <span className="mono" style={{fontSize:12}}>{a.id.slice(0,8)}…</span>
-                      <span className="muted" style={{fontSize:12}}>{a.status}</span>
-                    </div>
-                    <div className="muted" style={{fontSize:12, marginTop:3}}>{a.created_at}</div>
-                  </button>
+              {analyses.map(a => {
+                const stale = isAnalysisStale(a, activeDoc?.updated_at)
+                return (
+                  <div key={a.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
+                    <button className="btn" onClick={() => openAnalysis(a.id)} style={{flex:1, textAlign:'left'}}>
+                      <div style={{display:'flex', justifyContent:'space-between', gap:10}}>
+                        <span className="mono" style={{fontSize:12}}>{a.id.slice(0,8)}…</span>
+                        <span className="muted" style={{fontSize:12}}>
+                          {a.status}{stale ? ' · stale' : ''}
+                        </span>
+                      </div>
+                      <div className="muted" style={{fontSize:12, marginTop:3}}>{a.created_at}</div>
+                    </button>
 
-                  <button
-                    className="btn"
-                    title={isAnalyzing ? '분석 중에는 삭제할 수 없습니다.' : '삭제'}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteAnalysis(a.id) }}
-                    disabled={loading || isAnalyzing || isSavingDraft || isUploading}
-                    style={{width:56, display:'grid', placeItems:'center'}}
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))}
+                    <button
+                      className="btn"
+                      title={isAnalyzing ? '분석 중에는 삭제할 수 없습니다.' : '삭제'}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteAnalysis(a.id) }}
+                      disabled={loading || isAnalyzing || isSavingDraft || isUploading}
+                      style={{width:56, display:'grid', placeItems:'center'}}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </>
         )}
@@ -780,19 +981,59 @@ export default function App() {
           </div>
 
           <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4}}>
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', justifyContent:'flex-end'}}>
               {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
+              {isEditing && <Badge>편집 중</Badge>}
               <button
                 className="btn"
                 onClick={onRunAnalysis}
-                disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
+                disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft || isEditing || isSavingEdit}
                 style={{
-                  opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
-                  cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
+                  opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft || isEditing || isSavingEdit) ? 0.7 : 1,
+                  cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft || isEditing || isSavingEdit) ? 'not-allowed' : 'pointer',
                 }}
               >
                 {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
               </button>
+              {activeDoc && !isEditing && (
+                <button
+                  className="btn"
+                  onClick={startEditing}
+                  disabled={isAnalyzing || isUploading || isSavingDraft}
+                  style={{
+                    opacity: (isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
+                    cursor: (isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  편집
+                </button>
+              )}
+              {isEditing && (
+                <>
+                  <button
+                    className="btn"
+                    onClick={onSaveEdits}
+                    disabled={isSavingEdit || isAnalyzing || isUploading}
+                    style={{
+                      opacity: (isSavingEdit || isAnalyzing || isUploading) ? 0.7 : 1,
+                      cursor: (isSavingEdit || isAnalyzing || isUploading) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isSavingEdit ? '저장 중…' : '저장'}
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={cancelEditing}
+                    disabled={isSavingEdit}
+                    style={{
+                      opacity: isSavingEdit ? 0.7 : 1,
+                      cursor: isSavingEdit ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    취소
+                  </button>
+                </>
+              )}
             </div>
             {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
           </div>
@@ -800,9 +1041,91 @@ export default function App() {
 
         <div style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
           {activeDoc ? (
-            <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
-              {renderHighlightedText(activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)', filteredHighlights, issueReasonMap)}
-            </pre>
+            isEditing ? (
+              <div style={{display: 'grid', gridTemplateRows: '1fr 1fr', gap: 12, minHeight: 0}}>
+                <div style={{
+                  border: '1px solid #2a2a2c',
+                  borderRadius: 8,
+                  background: '#141417',
+                  padding: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  minHeight: 0
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8}}>
+                    <div style={{fontWeight: 700}}>편집 영역 (하이라이트 유지)</div>
+                    <Badge>editable</Badge>
+                  </div>
+                  <div style={{position: 'relative', flex: 1, minHeight: 140}}>
+                    <div
+                      ref={editorHighlightRef}
+                      aria-hidden="true"
+                      className="mono"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        padding: 10,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.5,
+                        fontSize: 12,
+                        color: 'transparent',
+                        overflow: 'hidden',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      {renderHighlightedText(editText || '', filteredEditorHighlights, issueReasonMap)}
+                    </div>
+                    <textarea
+                      ref={editorAreaRef}
+                      value={editText}
+                      onChange={onEditTextChange}
+                      onScroll={syncEditorScroll}
+                      className="mono"
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: '100%',
+                        minHeight: 140,
+                        resize: 'none',
+                        borderRadius: 6,
+                        border: '1px solid #2a2a2c',
+                        background: 'transparent',
+                        color: '#e6e6ea',
+                        padding: 10,
+                        outline: 'none',
+                        lineHeight: 1.5,
+                        fontSize: 12,
+                        caretColor: '#e6e6ea'
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{
+                  border: '1px solid #2a2a2c',
+                  borderRadius: 8,
+                  background: '#111114',
+                  padding: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  minHeight: 0
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8}}>
+                    <div style={{fontWeight: 700}}>원본 보기 (마지막 분석 기준)</div>
+                    <Badge>read-only</Badge>
+                  </div>
+                  <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12, margin: 0}}>
+                    {renderHighlightedText(activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)', filteredOriginalHighlights, issueReasonMap)}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
+                {renderHighlightedText(activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)', filteredHighlights, issueReasonMap)}
+              </pre>
+            )
           ) : (
             <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
           )}
@@ -863,6 +1186,7 @@ export default function App() {
 
           <div style={{display:'flex', gap:8, alignItems:'center'}}>
             {readerLevel && <Badge>독자 수준: {readerLevel}</Badge>}
+            {activeAnalysisStale && <Badge>stale</Badge>}
 
             {canShowJson && rightView === 'report' && (
               <button className="btn" onClick={() => setRightView('json')} disabled={!activeAnalysis}>

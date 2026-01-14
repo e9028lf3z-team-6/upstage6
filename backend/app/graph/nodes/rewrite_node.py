@@ -13,7 +13,9 @@ def extract_issues(result: dict | None):
 
 @traceable_timed(name="rewrite")
 def rewrite_node(state: AgentState) -> AgentState:
-    split_summary, _ = extract_split_payload(state.get("split_text"))
+    split_summary, split_sentences = extract_split_payload(state.get("split_text"))
+    if not split_summary and split_sentences:
+        split_summary = "\n".join(split_sentences[:5])
     result = rewrite_agent.run(
         original_text=state["original_text"],
         split_text=split_summary,
