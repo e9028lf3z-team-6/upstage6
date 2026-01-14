@@ -61,7 +61,7 @@ def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[st
         "original_text": text,
         "context": context,
     }
-    final_state: AgentState = agent_app.invoke(initial_state)
+    final_state: AgentState = await agent_app.ainvoke(initial_state)
 
     aggregated = final_state.get("aggregated_result") or {}
     decision = aggregated.get("decision")
