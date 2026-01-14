@@ -53,12 +53,10 @@ def split_with_map(text: str) -> Tuple[List[str], List[Dict[str, int | str]]]:
 
 def build_split_payload(
     text: str,
-    summary: str | None = None,
     embedding_dim: int | None = None,
 ) -> Dict[str, object]:
     sentences, split_map = split_with_map(text)
     payload: Dict[str, object] = {
-        "split_text": summary or "",
         "split_sentences": sentences,
         "split_map": split_map,
     }

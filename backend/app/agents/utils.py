@@ -20,11 +20,8 @@ def extract_split_payload(split_payload: Any) -> Tuple[str, List[str]]:
 
 
 def format_split_payload(split_payload: Any) -> str:
-    summary, sentences = extract_split_payload(split_payload)
+    _, sentences = extract_split_payload(split_payload)
     parts: List[str] = []
-    if summary:
-        parts.append("[요약]")
-        parts.append(summary)
     if sentences:
         parts.append("[문장 목록 JSON 배열 (index가 sentence_index)]")
         parts.append(json.dumps(sentences, ensure_ascii=False))

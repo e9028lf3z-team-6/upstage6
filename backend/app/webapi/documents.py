@@ -1,16 +1,23 @@
 import os
 import uuid
 import json
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
+from pydantic import BaseModel
 
 from app.core.db import get_session, Document
 from app.services.document_parser import document_parser
 from app.webapi.schemas import DocumentDetail, DocumentOut
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+class DocumentUpdate(BaseModel):
+    extracted_text: str
+    title: str | None = None
 
 
 @router.get("", response_model=list[DocumentOut])
@@ -48,6 +55,7 @@ async def upload_document(file: UploadFile = File(...)):
         stored_path=str(stored_path),
         extracted_text=text,
         meta_json=json.dumps(meta, ensure_ascii=False),
+        updated_at=datetime.utcnow(),
     )
 
     async with get_session() as session:
@@ -63,6 +71,21 @@ async def get_document(doc_id: str):
         doc = await session.get(Document, doc_id)
         if not doc:
             raise HTTPException(404, "Document not found")
+        return doc
+
+
+@router.patch("/{doc_id}", response_model=DocumentDetail)
+async def update_document(doc_id: str, payload: DocumentUpdate):
+    async with get_session() as session:
+        doc = await session.get(Document, doc_id)
+        if not doc:
+            raise HTTPException(404, "Document not found")
+        doc.extracted_text = payload.extracted_text
+        if payload.title is not None:
+            doc.title = payload.title
+        doc.updated_at = datetime.utcnow()
+        await session.commit()
+        await session.refresh(doc)
         return doc
 
 
