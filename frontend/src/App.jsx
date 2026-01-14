@@ -190,6 +190,10 @@ export default function App() {
   // settings
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme')
+    return saved === 'light' ? 'light' : 'dark'
+  })
 
   const [toasts, setToasts] = useState([])
 
@@ -239,6 +243,11 @@ export default function App() {
       })
     }
   }, [])
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = theme
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   async function onLogin() {
     window.location.href = 'http://localhost:8000/api/auth/login'
@@ -614,7 +623,15 @@ export default function App() {
           height: 0;
         }
       `}</style>
-      <div className="scroll-hide" style={{display:'grid', gridTemplateColumns:'300px 1fr 480px', height:'100vh', gap:8}}>
+      <div className="scroll-hide" style={{
+        display:'grid',
+        gridTemplateColumns:'300px 1fr 480px',
+        height:'100vh',
+        gap:8,
+        background: '#0f0f12',
+        filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
+        transition: 'filter 0.2s ease'
+      }}>
       {/* Toast notifications */}
       {toasts.length > 0 && (
         <div style={{
@@ -980,6 +997,56 @@ export default function App() {
                           background: '#0f0f12',
                           display: 'block',
                           transform: creativeFocus ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
+                          transition: 'transform 0.18s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
+                        }} />
+                      </span>
+                    </button>
+                  </div>
+
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 12}}>
+                    <div>
+                      <div style={{fontWeight: 800, fontSize: 16}}>테마</div>
+                      <div className="muted" style={{fontSize: 12}}>Light / Dark</div>
+                    </div>
+
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
+                      aria-pressed={theme === 'light'}
+                      style={{
+                        minWidth: 150,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        padding: '6px 10px'
+                      }}
+                    >
+                      <span style={{fontSize: 12, fontWeight: 800}}>
+                        {theme === 'light' ? 'Light' : 'Dark'}
+                      </span>
+
+                      <span aria-hidden="true" style={{
+                        width: SWITCH_W,
+                        height: SWITCH_H,
+                        borderRadius: 999,
+                        background: theme === 'light' ? '#66bb6a' : '#555',
+                        position: 'relative',
+                        display: 'inline-block',
+                        padding: SWITCH_PAD,
+                        boxSizing: 'border-box',
+                        transition: 'background 0.18s ease',
+                        border: '1px solid #2a2a2c'
+                      }}>
+                        <span style={{
+                          width: KNOB,
+                          height: KNOB,
+                          borderRadius: '50%',
+                          background: '#0f0f12',
+                          display: 'block',
+                          transform: theme === 'light' ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
                           transition: 'transform 0.18s ease',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
                         }} />
