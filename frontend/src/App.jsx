@@ -422,8 +422,6 @@ export default function App() {
   const downloadCloseTimer = useRef(null)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const legendCloseTimer = useRef(null)
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
-  const accountMenuRef = useRef(null)
   const [docScoreOpenId, setDocScoreOpenId] = useState(null)
   const [docScoreById, setDocScoreById] = useState({})
   const [docScoreLoadingId, setDocScoreLoadingId] = useState(null)
@@ -456,17 +454,6 @@ export default function App() {
       })
     }
   }, [])
-
-  useEffect(() => {
-    if (!isAccountMenuOpen) return
-    const handleClick = (event) => {
-      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
-        setIsAccountMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [isAccountMenuOpen])
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme
@@ -1539,109 +1526,75 @@ export default function App() {
             paddingTop: 10,
             borderTop: '1px solid #333'
           }}>
-            <div ref={accountMenuRef} style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {user ? (
-                <>
-                  <div
-                    className="account-bar"
-                    onClick={() => setIsAccountMenuOpen(prev => !prev)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="account-avatar">
-                      {user.picture ? (
-                        <img src={user.picture} alt={userDisplayName} style={{ width: '100%', height: '100%' }} />
-                      ) : (
-                        <span>{userInitial}</span>
-                      )}
-                    </div>
-                    <div className="account-meta">
-                      <div className="account-name">{userDisplayName}</div>
-                      <div className="account-plan">{planLabel}</div>
-                    </div>
-                    <span className="account-pill">{planLabel}</span>
+                <div className="account-bar">
+                  <div className="account-avatar">
+                    {user.picture ? (
+                      <img src={user.picture} alt={userDisplayName} style={{ width: '100%', height: '100%' }} />
+                    ) : (
+                      <span>{userInitial}</span>
+                    )}
                   </div>
-
-                  {isAccountMenuOpen && (
-                    <div
-                      className="card"
-                      style={{
-                        position: 'absolute',
-                        bottom: 'calc(100% + 8px)',
-                        right: 0,
-                        minWidth: 220,
-                        padding: 8,
-                        border: '2px solid #2a2a2c',
-                        background: '#0f0f12',
-                        zIndex: 60,
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false)
-                            pushToast('기능 준비 중입니다.', 'info')
-                          }}
-                          style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left' }}
-                        >
-                          계정 관리
-                        </button>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false)
-                            pushToast('기능 준비 중입니다.', 'info')
-                          }}
-                          style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left' }}
-                        >
-                          개인 설정
-                        </button>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false)
-                            openSettingsPanel()
-                          }}
-                          style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left' }}
-                        >
-                          설정
-                        </button>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false)
-                            pushToast('기능 준비 중입니다.', 'info')
-                          }}
-                          style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left' }}
-                        >
-                          도움말
-                        </button>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false)
-                            onLogout()
-                          }}
-                          style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left' }}
-                        >
-                          로그아웃
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
+                  <div className="account-meta">
+                    <div className="account-name">{userDisplayName}</div>
+                    <div className="account-plan">{planLabel}</div>
+                  </div>
+                </div>
               ) : (
-                <div className="account-bar" onClick={onLogin} role="button" tabIndex={0}>
+                <div className="account-bar" onClick={onLogin} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
                   <div className="account-avatar">?</div>
                   <div className="account-meta">
-                    <div className="account-name">로그인</div>
-                    <div className="account-plan">계정을 연결하세요</div>
+                    <div className="account-name">Login</div>
+                    <div className="account-plan">Connect account</div>
                   </div>
                   <span className="account-pill">Sign in</span>
                 </div>
               )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={onLogout}
+                  title="Logout"
+                  aria-label="Logout"
+                  disabled={!user}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    display: 'grid',
+                    placeItems: 'center',
+                    opacity: user ? 1 : 0.45,
+                    cursor: user ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <path d="M10 17l5-5-5-5" />
+                    <path d="M15 12H3" />
+                  </svg>
+                </button>
+
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={openSettingsPanel}
+                  title="Settings"
+                  aria-label="Settings"
+                  aria-pressed={leftMode === 'settings'}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginLeft: -4,
+                    background: leftMode === 'settings' ? '#2a2a2c' : undefined
+                  }}
+                >
+                  <SettingsIcon />
+                </button>
+              </div>
             </div>
           </div>
         </div>
