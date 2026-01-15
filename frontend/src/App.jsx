@@ -299,7 +299,7 @@ function formatDisplayTimestamp(value) {
   if (!value) return ''
   const raw = String(value).trim()
   const tzPattern = /([zZ]|[+\-]\d{2}:?\d{2})$/
-  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?`)
+  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/)
 
   let dateStringToParse = raw
   if (baseMatch && !tzPattern.test(raw)) {
@@ -1023,12 +1023,13 @@ function SettingsIcon({ size = 28 }) {
       `}</style>
       <div className="scroll-hide main-layout" style={{
         display: 'grid',
-        gridTemplateColumns: `300px 1fr ${isRightPanelOpen ? '480px' : '0px'} `,
+        gridTemplateColumns: `300px 1fr ${isRightPanelOpen ? '480px' : '0px'}`,
         height: '100vh',
         gap: 8,
         background: '#0f0f12',
         filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
-        transition: 'grid-template-columns 0.3s ease-in-out, filter 0.2s ease'
+        transition: 'grid-template-columns 0.3s ease-in-out, filter 0.2s ease',
+        overflow: 'hidden'
       }}>
         {/* Toast notifications */}
         {toasts.length > 0 && (
