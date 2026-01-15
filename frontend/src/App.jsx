@@ -413,7 +413,7 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
-  const planLabel = 'Plus'
+  const planLabel = ''
   const userDisplayName = user?.name || '사용자'
   const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
 
@@ -1062,7 +1062,7 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 700 }}>CONTEXTOR</div>
-              <div className="muted" style={{ fontSize: 12 }}>PDF/DOCX/HWP 업로드</div>
+              <div className="muted" style={{ fontSize: 12 }}>PDF/DOCX/HWP</div>
             </div>
 
             <button
@@ -1542,7 +1542,7 @@ export default function App() {
                     </div>
                     <div className="account-meta">
                       <div className="account-name">{userDisplayName}</div>
-                      <div className="account-plan">Plan: {planLabel}</div>
+                      <div className="account-plan">{planLabel}</div>
                     </div>
                     <span className="account-pill">{planLabel}</span>
                   </div>
