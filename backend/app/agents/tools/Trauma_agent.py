@@ -2,6 +2,7 @@ from typing import Dict, List
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
 from app.agents.utils import format_split_payload
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class TraumaAgent(BaseAgent):
@@ -18,14 +19,30 @@ class TraumaAgent(BaseAgent):
         all_issues = []
         chunk_size = 50
         
+        chunks = []
         for i in range(0, len(sentences), chunk_size):
-            chunk = sentences[i:i + chunk_size]
-            chunk_result = self._analyze_chunk(chunk, i)
-            all_issues.extend(chunk_result.get("issues", []))
+            chunks.append((sentences[i:i + chunk_size], i))
+            
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [
+                executor.submit(self._analyze_chunk, chunk, idx)
+                for chunk, idx in chunks
+            ]
+            
+            for future in as_completed(futures):
+                try:
+                    res = future.result()
+                    if res and "issues" in res:
+                        all_issues.extend(res["issues"])
+                except Exception as e:
+                    print(f"[TraumaAgent] Chunk failed: {e}")
+
+        # 정렬: 문장 인덱스 순
+        all_issues.sort(key=lambda x: x.get("sentence_index", -1))
             
         return {
             "issues": all_issues,
-            "note": f"Analyzed trauma risks in {len(sentences)} sentences."
+            "note": f"Analyzed {len(sentences)} sentences in {len(chunks)} chunks (Parallel)"
         }
 
     def _analyze_chunk(self, chunk: list[str], start_index: int) -> dict:
