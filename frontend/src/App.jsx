@@ -35,16 +35,16 @@ function Badge({ children }) {
 }
 
 const ISSUE_COLORS = {
-  tone: 'rgba(0, 150, 136, 0.4)',
-  logic: 'rgba(255, 202, 40, 0.4)',
-  causality: 'rgba(255, 202, 40, 0.4)',
-  trauma: 'rgba(239, 83, 80, 0.45)',
-  hate_bias: 'rgba(171, 71, 188, 0.4)',
-  genre_cliche: 'rgba(66, 165, 245, 0.4)',
-  cliche: 'rgba(66, 165, 245, 0.4)',
-  spelling: 'rgba(239, 83, 80, 0.3)',
-  tension: 'rgba(255, 112, 67, 0.4)',
-  default: 'rgba(158, 158, 158, 0.35)'
+  tone: 'rgba(92, 107, 192, 0.5)',    // Indigo
+  logic: 'rgba(255, 235, 59, 0.5)',   // Yellow
+  causality: 'rgba(255, 167, 38, 0.5)', // Orange
+  trauma: 'rgba(239, 83, 80, 0.5)',     // Red
+  hate_bias: 'rgba(171, 71, 188, 0.5)',// Purple
+  genre_cliche: 'rgba(66, 165, 245, 0.5)',// Blue
+  cliche: 'rgba(38, 198, 218, 0.5)',   // Turquoise
+  spelling: 'rgba(236, 64, 122, 0.5)', // Pink
+  tension: 'rgba(139, 195, 74, 0.5)',  // Light Green
+  default: 'rgba(189, 189, 189, 0.4)'  // Grey
 }
 
 function HighlightedText({ text, analysisResult, setTooltip }) {
@@ -95,7 +95,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
     })
 
     if (highlightItems.length === 0) {
-      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 15 }}>{text}</div>
     }
 
     const boundaries = new Set([0, textLen])
@@ -141,7 +141,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
     }
 
     return (
-      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
+      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
         {segments.map(segment => {
           if (!segment.issues.length) {
             return <span key={`${segment.start}-${segment.end}`}>{segment.text}</span>
@@ -172,7 +172,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   }
 
   if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
-    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 15 }}>{text}</div>
   }
 
   // ... (fallback logic, can be updated later if needed)
@@ -222,7 +222,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   })
 
   return (
-    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
+    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
         if (sentIssues.length === 0) {
@@ -299,7 +299,7 @@ function formatDisplayTimestamp(value) {
   if (!value) return ''
   const raw = String(value).trim()
   const tzPattern = /([zZ]|[+\-]\d{2}:?\d{2})$/
-  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?`)
 
   let dateStringToParse = raw
   if (baseMatch && !tzPattern.test(raw)) {
@@ -367,11 +367,15 @@ const TOAST_STYLES = {
 }
 
 const PERSONA_LEGEND = [
-  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'tone', label: '어조 에이전트' },
+  { key: 'logic', label: '논리 에이전트' },
   { key: 'causality', label: '개연성 에이전트' },
+  { key: 'trauma', label: '트라우마 에이전트' },
   { key: 'hate_bias', label: '혐오·편향 에이전트' },
-  { key: 'cliche', label: '장르 클리셰 에이전트' },
-  { key: 'tension', label: '긴장도 에이전트' }
+  { key: 'genre_cliche', label: '장르 클리셰 에이전트' },
+  { key: 'cliche', label: '클리셰 에이전트' },
+  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'tension', label: '긴장도 에이전트' },
 ]
 
 export default function App() {
@@ -391,6 +395,7 @@ export default function App() {
   // settings
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
+  const [topic, setTopic] = useState('소설')
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -413,6 +418,8 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
+  const [isDraftInputOpen, setIsDraftInputOpen] = useState(false)
   const planLabel = ''
   const userDisplayName = user?.name || '사용자'
   const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
@@ -791,7 +798,6 @@ export default function App() {
     await uploadOneFile(file)
   }
 
-
 function SettingsIcon({ size = 28 }) {
   return (
 
@@ -1017,12 +1023,12 @@ function SettingsIcon({ size = 28 }) {
       `}</style>
       <div className="scroll-hide main-layout" style={{
         display: 'grid',
-        gridTemplateColumns: '300px 1fr 480px',
+        gridTemplateColumns: `300px 1fr ${isRightPanelOpen ? '480px' : '0px'} `,
         height: '100vh',
         gap: 8,
         background: '#0f0f12',
         filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
-        transition: 'filter 0.2s ease'
+        transition: 'grid-template-columns 0.3s ease-in-out, filter 0.2s ease'
       }}>
         {/* Toast notifications */}
         {toasts.length > 0 && (
@@ -1209,9 +1215,6 @@ function SettingsIcon({ size = 28 }) {
                 }}>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>설정</div>
-                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      설정 내용은 나중에 추가할 것
-                    </div>
                   </div>
                 </div>
 
@@ -1377,10 +1380,14 @@ function SettingsIcon({ size = 28 }) {
                       <button
                         className="btn"
                         onClick={() => {
-                          setActiveDocId(d.id)
-                          openLatestDocScore(d.id)
+                          if (docScoreOpenId === d.id) {
+                            setDocScoreOpenId(null)
+                          } else {
+                            setActiveDocId(d.id)
+                            openLatestDocScore(d.id)
+                          }
                         }}
-                        style={{
+                        style={{ 
                           flex: 1,
                           textAlign: 'left',
                           background: d.id === activeDocId ? '#1b1b1f' : undefined
@@ -1517,7 +1524,24 @@ function SettingsIcon({ size = 28 }) {
           {/* Error banner */}
           {error && (
             <div className="card" style={{ marginTop: 12, padding: 12, borderColor: '#5a2a2a', background: '#1a0f10' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+                <button
+                  onClick={() => setError(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    fontSize: 20,
+                    lineHeight: 0.8,
+                    padding: '0 4px'
+                  }}
+                  title="오류 숨기기"
+                >
+                  &times;
+                </button>
+              </div>
               <div className="mono" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{error}</div>
             </div>
           )}
@@ -1668,7 +1692,7 @@ function SettingsIcon({ size = 28 }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {PERSONA_LEGEND.map(item => (
                         <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{
+                          <span style={{ 
                             width: 10,
                             height: 10,
                             borderRadius: 3,
@@ -1697,10 +1721,15 @@ function SettingsIcon({ size = 28 }) {
                 style={{
                   opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
                   cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
-                  marginRight: 6
+                  display: 'grid', placeItems: 'center', // Center the icon
+                  padding: 8, // Make it square
                 }}
               >
-                {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+                {isAnalyzing ? '분석 중…' : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#4CAF50" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                )}
               </button>
 
               <div
@@ -1715,14 +1744,17 @@ function SettingsIcon({ size = 28 }) {
                   style={{
                     opacity: !activeDoc ? 0.6 : 1,
                     cursor: !activeDoc ? 'not-allowed' : 'pointer',
-                    paddingLeft: 12,
-                    paddingRight: 12
+                    display: 'grid', placeItems: 'center', // Center the icon
+                    padding: 8, // Make it square
                   }}
                   title="내보내기"
                 >
-                  내보내기
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
                 </button>
-
                 {isDownloadOpen && activeDoc && (
                   <div
                     className="card"
@@ -1767,6 +1799,21 @@ function SettingsIcon({ size = 28 }) {
                   </div>
                 )}
               </div>
+
+              <button
+                className="btn"
+                onClick={() => setIsRightPanelOpen(prev => !prev)}
+                title="보고서 패널 토글"
+                style={{ padding: 8, display: 'grid', placeItems: 'center' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -1779,7 +1826,7 @@ function SettingsIcon({ size = 28 }) {
                   <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
                 </div>
               ) : (
-                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 12 }}>
+                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 15 }}>
                   {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
                 </pre>
               )
@@ -1832,7 +1879,15 @@ function SettingsIcon({ size = 28 }) {
         </div>
 
         {/* Right panel */}
-        <div className="card scroll-hide right-panel" style={{ padding: 8, overflow: 'auto' }}>
+        <div
+          className="card right-panel"
+          style={{
+            padding: 8,
+            overflow: isRightPanelOpen ? 'auto' : 'hidden',
+            opacity: isRightPanelOpen ? 1 : 0,
+            transition: 'opacity 0.2s ease-in-out'
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>분석 결과</div>
@@ -1851,10 +1906,11 @@ function SettingsIcon({ size = 28 }) {
               )}
 
               {canShowJson && rightView === 'json' && (
-                <button className="btn" onClick={() => setRightView('report')}>
+                <button className="btn" onClick={() => setRightView('report')}> 
                   돌아오기
                 </button>
               )}
+
             </div>
           </div>
 
@@ -1970,7 +2026,7 @@ function SettingsIcon({ size = 28 }) {
                                 background: activeAnalysis?.id === item.id ? '#1b1b1f' : undefined
                               }}
                             >
-                              {/* historyLabel 미정의 버그 수정: item.id 표시 */}
+                              {/* ✅ historyLabel 미정의 버그 수정: item.id 표시 */}
                               <span
                                 title={labelTitle}
                                 style={{
