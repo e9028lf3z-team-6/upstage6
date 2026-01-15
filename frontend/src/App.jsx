@@ -35,16 +35,16 @@ function Badge({ children }) {
 }
 
 const ISSUE_COLORS = {
-  tone: 'rgba(0, 150, 136, 0.4)',
-  logic: 'rgba(255, 202, 40, 0.4)',
-  causality: 'rgba(255, 202, 40, 0.4)',
-  trauma: 'rgba(239, 83, 80, 0.45)',
-  hate_bias: 'rgba(171, 71, 188, 0.4)',
-  genre_cliche: 'rgba(66, 165, 245, 0.4)',
-  cliche: 'rgba(66, 165, 245, 0.4)',
-  spelling: 'rgba(239, 83, 80, 0.3)',
-  tension: 'rgba(255, 112, 67, 0.4)',
-  default: 'rgba(158, 158, 158, 0.35)'
+  tone: 'rgba(92, 107, 192, 0.5)',    // Indigo
+  logic: 'rgba(255, 235, 59, 0.5)',   // Yellow
+  causality: 'rgba(255, 167, 38, 0.5)', // Orange
+  trauma: 'rgba(239, 83, 80, 0.5)',     // Red
+  hate_bias: 'rgba(171, 71, 188, 0.5)',// Purple
+  genre_cliche: 'rgba(66, 165, 245, 0.5)',// Blue
+  cliche: 'rgba(38, 198, 218, 0.5)',   // Turquoise
+  spelling: 'rgba(236, 64, 122, 0.5)', // Pink
+  tension: 'rgba(139, 195, 74, 0.5)',  // Light Green
+  default: 'rgba(189, 189, 189, 0.4)'  // Grey
 }
 
 function HighlightedText({ text, analysisResult, setTooltip }) {
@@ -95,7 +95,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
     })
 
     if (highlightItems.length === 0) {
-      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 15 }}>{text}</div>
     }
 
     const boundaries = new Set([0, textLen])
@@ -141,7 +141,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
     }
 
     return (
-      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
+      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
         {segments.map(segment => {
           if (!segment.issues.length) {
             return <span key={`${segment.start}-${segment.end}`}>{segment.text}</span>
@@ -172,7 +172,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   }
 
   if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
-    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 15 }}>{text}</div>
   }
 
   // ... (fallback logic, can be updated later if needed)
@@ -222,7 +222,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   })
 
   return (
-    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
+    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
         if (sentIssues.length === 0) {
@@ -367,11 +367,15 @@ const TOAST_STYLES = {
 }
 
 const PERSONA_LEGEND = [
-  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'tone', label: '어조 에이전트' },
+  { key: 'logic', label: '논리 에이전트' },
   { key: 'causality', label: '개연성 에이전트' },
+  { key: 'trauma', label: '트라우마 에이전트' },
   { key: 'hate_bias', label: '혐오·편향 에이전트' },
-  { key: 'cliche', label: '장르 클리셰 에이전트' },
-  { key: 'tension', label: '긴장도 에이전트' }
+  { key: 'genre_cliche', label: '장르 클리셰 에이전트' },
+  { key: 'cliche', label: '클리셰 에이전트' },
+  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'tension', label: '긴장도 에이전트' },
 ]
 
 export default function App() {
@@ -1017,15 +1021,13 @@ export default function App() {
         }
       `}</style>
       <div className="scroll-hide main-layout" style={{
-        position: 'relative', // For absolute positioning of the right panel
-        overflow: 'hidden', // To contain the sliding panel
         display: 'grid',
-        gridTemplateColumns: '300px 1fr', // Right panel is no longer in the grid flow
+        gridTemplateColumns: `300px 1fr ${isRightPanelOpen ? '480px' : '0px'}`,
         height: '100vh',
         gap: 8,
         background: '#0f0f12',
         filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
-        transition: 'filter 0.2s ease'
+        transition: 'grid-template-columns 0.3s ease-in-out, filter 0.2s ease'
       }}>
         {/* Toast notifications */}
         {toasts.length > 0 && (
@@ -1810,7 +1812,7 @@ export default function App() {
                   <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
                 </div>
               ) : (
-                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 12 }}>
+                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 15 }}>
                   {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
                 </pre>
               )
@@ -1867,15 +1869,9 @@ export default function App() {
           className="card right-panel"
           style={{
             padding: 8,
-            overflow: 'auto',
-            position: 'absolute',
-            top: 65,
-            right: 8,
-            bottom: 8,
-            width: 480,
-            transform: isRightPanelOpen ? 'translateX(0)' : 'translateX(calc(100% + 8px))',
-            transition: 'transform 0.3s ease-in-out',
-            zIndex: 10,
+            overflow: isRightPanelOpen ? 'auto' : 'hidden',
+            opacity: isRightPanelOpen ? 1 : 0,
+            transition: 'opacity 0.2s ease-in-out'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
