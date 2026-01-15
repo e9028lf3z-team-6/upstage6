@@ -312,12 +312,17 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const planLabel = 'Plus'
+  const userDisplayName = user?.name || '사용자'
+  const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
 
   //  download hover menu
   const [isDownloadOpen, setIsDownloadOpen] = useState(false)
   const downloadCloseTimer = useRef(null)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const legendCloseTimer = useRef(null)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef(null)
 
   function pushToast(message, variant = 'info') {
     const id = (toastIdRef.current += 1)
@@ -344,6 +349,17 @@ export default function App() {
       })
     }
   }, [])
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return
+    const handleClick = (event) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setIsAccountMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [isAccountMenuOpen])
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme
@@ -600,19 +616,6 @@ export default function App() {
     await uploadOneFile(file)
   }
 
-  function SettingsIcon() {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
-        <path
-          d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
 
   // toggle sizes
   const SWITCH_W = 44
@@ -723,6 +726,74 @@ export default function App() {
           width: 0;
           height: 0;
         }
+        .account-bar {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border: 1px solid #2a2a2c;
+          border-radius: 12px;
+          background: #141417;
+          color: #e6e6ea;
+          cursor: pointer;
+          transition: background 0.18s ease, border-color 0.18s ease;
+        }
+        .account-bar:hover {
+          background: #1b1b1f;
+          border-color: #3a3a3f;
+        }
+        .account-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #2a2a2c;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          color: #cfcfd6;
+          font-weight: 700;
+          font-size: 12px;
+          flex: 0 0 auto;
+        }
+        .account-meta {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+          flex: 1;
+        }
+        .account-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: #e6e6ea;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .account-plan {
+          font-size: 11px;
+          color: #9aa0a6;
+        }
+        .account-pill {
+          font-size: 10px;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 999px;
+          border: 1px solid #2a2a2c;
+          background: #101014;
+          color: #cfcfd6;
+          flex: 0 0 auto;
+        }
+        @media (max-width: 640px) {
+          .account-bar {
+            padding: 6px 8px;
+            gap: 8px;
+          }
+          .account-plan {
+            display: none;
+          }
+        }
       `}</style>
       <div className="scroll-hide" style={{
         display:'grid',
@@ -814,46 +885,6 @@ export default function App() {
 
       {/* Left panel */}
       <div className="card" style={{padding:8, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0}}>
-        {/* User Profile */}
-        <div style={{marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid #333'}}>
-          {user ? (
-            <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
-              <img src={user.picture} alt={user.name} style={{width: 32, height: 32, borderRadius: '50%'}} />
-              <div style={{flex: 1, minWidth: 0}}>
-                <div style={{fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  {user.name}
-                </div>
-                <div style={{fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  {user.email}
-                </div>
-              </div>
-              <button className="btn" onClick={onLogout} style={{padding: '4px 8px', fontSize: 11}}>로그아웃</button>
-            </div>
-          ) : (
-            <button
-              className="btn"
-              onClick={onLogin}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: '#4285F4',
-                color: 'white',
-                border: 'none'
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18">
-                <path fill="currentColor" d="M17.64 8.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.85 2.21c1.67-1.54 2.63-3.81 2.63-6.56z"></path>
-                <path fill="currentColor" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.85-2.21c-.79.53-1.81.85-3.11.85-2.39 0-4.41-1.61-5.14-3.78H.9v2.33C2.39 16.15 5.44 18 9 18z"></path>
-                <path fill="currentColor" d="M3.86 10.68c-.19-.56-.3-1.16-.3-1.78s.11-1.22.3-1.78V4.79H.9C.33 5.93 0 7.22 0 8.6c0 1.38.33 2.67.9 3.81l2.96-2.33z"></path>
-                <path fill="currentColor" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0 5.44 0 2.39 1.85.9 4.79l2.96 2.33c.73-2.17 2.75-3.78 5.14-3.78z"></path>
-              </svg>
-              Google로 로그인
-            </button>
-          )}
-        </div>
 
         {/* Header + Upload button */}
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
@@ -1228,26 +1259,116 @@ export default function App() {
           </div>
         )}
 
-        {/* bottom bar */}
-        <div style={{
+      {/* bottom bar */}
+      <div style={{
           marginTop: 12,
           paddingTop: 10,
-          borderTop: '1px solid #333',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 10
+          borderTop: '1px solid #333'
         }}>
-          <div className="muted" style={{fontSize: 12}} />
-          <button
-            className="btn"
-            onClick={openSettingsPanel}
-            disabled={isUploading}
-            title="설정"
-            style={{width: 52, height: 46, display: 'grid', placeItems: 'center', padding: 0}}
-          >
-            <SettingsIcon />
-          </button>
+          <div ref={accountMenuRef} style={{position: 'relative'}}>
+            {user ? (
+              <>
+                <div
+                  className="account-bar"
+                  onClick={() => setIsAccountMenuOpen(prev => !prev)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="account-avatar">
+                    {user.picture ? (
+                      <img src={user.picture} alt={userDisplayName} style={{width: '100%', height: '100%'}} />
+                    ) : (
+                      <span>{userInitial}</span>
+                    )}
+                  </div>
+                  <div className="account-meta">
+                    <div className="account-name">{userDisplayName}</div>
+                    <div className="account-plan">Plan: {planLabel}</div>
+                  </div>
+                  <span className="account-pill">{planLabel}</span>
+                </div>
+
+                {isAccountMenuOpen && (
+                  <div
+                    className="card"
+                    style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      right: 0,
+                      minWidth: 220,
+                      padding: 8,
+                      border: '2px solid #2a2a2c',
+                      background: '#0f0f12',
+                      zIndex: 60,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
+                    }}
+                  >
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false)
+                          pushToast('기능 준비 중입니다.', 'info')
+                        }}
+                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
+                      >
+                        계정 관리
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false)
+                          pushToast('기능 준비 중입니다.', 'info')
+                        }}
+                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
+                      >
+                        개인 설정
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false)
+                          openSettingsPanel()
+                        }}
+                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
+                      >
+                        설정
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false)
+                          pushToast('기능 준비 중입니다.', 'info')
+                        }}
+                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
+                      >
+                        도움말
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false)
+                          onLogout()
+                        }}
+                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
+                      >
+                        로그아웃
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="account-bar" onClick={onLogin} role="button" tabIndex={0}>
+                <div className="account-avatar">?</div>
+                <div className="account-meta">
+                  <div className="account-name">로그인</div>
+                  <div className="account-plan">계정을 연결하세요</div>
+                </div>
+                <span className="account-pill">Sign in</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
