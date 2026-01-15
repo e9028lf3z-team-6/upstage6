@@ -148,7 +148,10 @@ function HighlightedText({ text, analysisResult }) {
   }
 
   const sentences = analysisResult.split_sentences
-  const allIssues = []
+  // Aggregate all issues from different agents
+  let allIssues = []
+
+  // Helper to collect issues
   const collect = (source, type) => {
     if (source?.issues && Array.isArray(source.issues)) {
       source.issues.forEach(issue => {
@@ -183,10 +186,17 @@ function HighlightedText({ text, analysisResult }) {
     <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
+        // If no issues, return sentence as is (plus a space usually)
         if (sentIssues.length === 0) {
           return <span key={idx}>{sent} </span>
         }
 
+        // Simple highlighting: just highlight the whole sentence if it has issues for now
+        // OR (Advanced): Split sentence by char_start/char_end.
+        // Let's do a simpler version first: Highlight specific ranges if non-overlapping.
+        // For robustness in this MVP, we'll sort issues by start char and try to highlight.
+
+        // Sort by start position
         sentIssues.sort((a, b) => (a.char_start || 0) - (b.char_start || 0))
 
         let lastIndex = 0
