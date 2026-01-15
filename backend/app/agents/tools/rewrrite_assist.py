@@ -33,6 +33,36 @@ class RewriteAssistAgent(BaseAgent):
         cliche_issues = cliche_issues or []
         spelling_issues = spelling_issues or []
 
+        # --- 토큰 최적화 로직 시작 ---
+        def _optimize_issues(issues: list, limit: int = 20) -> list:
+            """
+            토큰 제한을 방지하기 위해 이슈 리스트를 축소합니다.
+            - 상위 N개만 유지
+            - 인용문(quote) 길이 제한
+            """
+            if not issues:
+                return []
+            
+            optimized = []
+            for item in issues[:limit]:
+                # 얕은 복사로 원본 보존
+                new_item = item.copy()
+                # 긴 텍스트 필드 축소
+                for key in ['quote', 'original', 'description', 'reason']:
+                    if key in new_item and isinstance(new_item[key], str) and len(new_item[key]) > 100:
+                        new_item[key] = new_item[key][:100] + "..."
+                optimized.append(new_item)
+            return optimized
+
+        # 각 카테고리별 이슈 최적화 (가이드 생성용 요약)
+        opt_hate = _optimize_issues(hate_issues)
+        opt_trauma = _optimize_issues(trauma_issues)
+        opt_logic = _optimize_issues(logic_issues)
+        opt_tone = _optimize_issues(tone_issues)
+        opt_cliche = _optimize_issues(cliche_issues)
+        opt_spelling = _optimize_issues(spelling_issues)
+        # --- 토큰 최적화 로직 끝 ---
+
         primary_issue = decision_context.get("primary_issue")
         rationale = decision_context.get("rationale", {})
         surface_issues = decision_context.get("surface_issues", {})
@@ -83,13 +113,13 @@ JSON 외 텍스트 출력 금지.
 - reader_confusion_detected: {reader_confusion}
 - reader_context_gap: {reader_context_gap}
 
-이슈 목록:
-- hate: {hate_issues}
-- trauma: {trauma_issues}
-- logic: {logic_issues}
-- tone: {tone_issues}
-- cliche: {cliche_issues}
-- spelling(surface): {spelling_issues}
+이슈 목록 (일부 요약됨):
+- hate (총 {len(hate_issues)}건): {opt_hate}
+- trauma (총 {len(trauma_issues)}건): {opt_trauma}
+- logic (총 {len(logic_issues)}건): {opt_logic}
+- tone (총 {len(tone_issues)}건): {opt_tone}
+- cliche (총 {len(cliche_issues)}건): {opt_cliche}
+- spelling (총 {len(spelling_issues)}건): {opt_spelling}
 
 작성 지침:
 - 각 guideline에는 아래 4가지 키를 반드시 포함
