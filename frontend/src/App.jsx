@@ -391,6 +391,7 @@ export default function App() {
   // settings
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
+  const [topic, setTopic] = useState('소설')
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -413,6 +414,8 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
+  const [isDraftInputOpen, setIsDraftInputOpen] = useState(false)
   const planLabel = ''
   const userDisplayName = user?.name || '사용자'
   const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
@@ -1014,8 +1017,10 @@ export default function App() {
         }
       `}</style>
       <div className="scroll-hide main-layout" style={{
+        position: 'relative', // For absolute positioning of the right panel
+        overflow: 'hidden', // To contain the sliding panel
         display: 'grid',
-        gridTemplateColumns: '300px 1fr 480px',
+        gridTemplateColumns: '300px 1fr', // Right panel is no longer in the grid flow
         height: '100vh',
         gap: 8,
         background: '#0f0f12',
@@ -1207,9 +1212,6 @@ export default function App() {
                 }}>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>설정</div>
-                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      설정 내용은 나중에 추가할 것
-                    </div>
                   </div>
                 </div>
 
@@ -1375,8 +1377,12 @@ export default function App() {
                       <button
                         className="btn"
                         onClick={() => {
-                          setActiveDocId(d.id)
-                          openLatestDocScore(d.id)
+                          if (docScoreOpenId === d.id) {
+                            setDocScoreOpenId(null)
+                          } else {
+                            setActiveDocId(d.id)
+                            openLatestDocScore(d.id)
+                          }
                         }}
                         style={{
                           flex: 1,
@@ -1515,7 +1521,24 @@ export default function App() {
           {/* Error banner */}
           {error && (
             <div className="card" style={{ marginTop: 12, padding: 12, borderColor: '#5a2a2a', background: '#1a0f10' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+                <button
+                  onClick={() => setError(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    fontSize: 20,
+                    lineHeight: 0.8,
+                    padding: '0 4px'
+                  }}
+                  title="오류 숨기기"
+                >
+                  &times;
+                </button>
+              </div>
               <div className="mono" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{error}</div>
             </div>
           )}
@@ -1682,10 +1705,15 @@ export default function App() {
                 style={{
                   opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
                   cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
-                  marginRight: 6
+                  display: 'grid', placeItems: 'center', // Center the icon
+                  padding: 8, // Make it square
                 }}
               >
-                {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+                {isAnalyzing ? '분석 중…' : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#4CAF50" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                )}
               </button>
 
               <div
@@ -1700,14 +1728,17 @@ export default function App() {
                   style={{
                     opacity: !activeDoc ? 0.6 : 1,
                     cursor: !activeDoc ? 'not-allowed' : 'pointer',
-                    paddingLeft: 12,
-                    paddingRight: 12
+                    display: 'grid', placeItems: 'center', // Center the icon
+                    padding: 8, // Make it square
                   }}
                   title="내보내기"
                 >
-                  내보내기
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
                 </button>
-
                 {isDownloadOpen && activeDoc && (
                   <div
                     className="card"
@@ -1752,6 +1783,21 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              <button
+                className="btn"
+                onClick={() => setIsRightPanelOpen(prev => !prev)}
+                title="보고서 패널 토글"
+                style={{ padding: 8, display: 'grid', placeItems: 'center' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -1817,7 +1863,21 @@ export default function App() {
         </div>
 
         {/* Right panel */}
-        <div className="card scroll-hide right-panel" style={{ padding: 8, overflow: 'auto' }}>
+        <div
+          className="card right-panel"
+          style={{
+            padding: 8,
+            overflow: 'auto',
+            position: 'absolute',
+            top: 65,
+            right: 8,
+            bottom: 8,
+            width: 480,
+            transform: isRightPanelOpen ? 'translateX(0)' : 'translateX(calc(100% + 8px))',
+            transition: 'transform 0.3s ease-in-out',
+            zIndex: 10,
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>분석 결과</div>
@@ -1840,6 +1900,7 @@ export default function App() {
                   돌아오기
                 </button>
               )}
+
             </div>
           </div>
 
