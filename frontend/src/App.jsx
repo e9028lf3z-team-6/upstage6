@@ -312,7 +312,7 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
-  const planLabel = 'Plus'
+
   const userDisplayName = user?.name || '사용자'
   const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
 
@@ -321,8 +321,6 @@ export default function App() {
   const downloadCloseTimer = useRef(null)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const legendCloseTimer = useRef(null)
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
-  const accountMenuRef = useRef(null)
 
   function pushToast(message, variant = 'info') {
     const id = (toastIdRef.current += 1)
@@ -349,17 +347,6 @@ export default function App() {
       })
     }
   }, [])
-
-  useEffect(() => {
-    if (!isAccountMenuOpen) return
-    const handleClick = (event) => {
-      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
-        setIsAccountMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [isAccountMenuOpen])
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme
@@ -581,12 +568,6 @@ export default function App() {
     setError(null)
   }
 
-  function openSettingsPanel() {
-    setLeftMode(prev => (prev === 'settings' ? 'list' : 'settings'))
-    setIsDragOver(false)
-    setError(null)
-  }
-
   function closeLeftPanelToList() {
     if (isUploading) return
     setLeftMode('list')
@@ -614,6 +595,26 @@ export default function App() {
     const file = e.dataTransfer?.files?.[0]
     if (!file) return
     await uploadOneFile(file)
+  }
+
+  function openSettingsPanel() {
+    setLeftMode(prev => (prev === 'settings' ? 'list' : 'settings'))
+    setIsDragOver(false)
+    setError(null)
+  }
+
+  function SettingsIcon() {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
   }
 
 
@@ -736,13 +737,10 @@ export default function App() {
           border-radius: 12px;
           background: #141417;
           color: #e6e6ea;
-          cursor: pointer;
+          cursor: default;
           transition: background 0.18s ease, border-color 0.18s ease;
         }
-        .account-bar:hover {
-          background: #1b1b1f;
-          border-color: #3a3a3f;
-        }
+        /* Hover effect removed for account-bar since popup is gone */
         .account-avatar {
           width: 32px;
           height: 32px;
@@ -883,7 +881,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Left panel */}
+      {/* Left panel (Sidebar) */}
       <div className="card" style={{padding:8, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0}}>
 
         {/* Header + Upload button */}
@@ -1190,7 +1188,7 @@ export default function App() {
               </div>
             </div>
           )}
-
+          
           {/* List panel */}
           {leftMode === 'list' && (
             <>
@@ -1259,404 +1257,377 @@ export default function App() {
           </div>
         )}
 
-      {/* bottom bar */}
+      {/* Footer: User & Settings */}
       <div style={{
-          marginTop: 12,
-          paddingTop: 10,
-          borderTop: '1px solid #333'
-        }}>
-          <div ref={accountMenuRef} style={{position: 'relative'}}>
-            {user ? (
-              <>
-                <div
-                  className="account-bar"
-                  onClick={() => setIsAccountMenuOpen(prev => !prev)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="account-avatar">
-                    {user.picture ? (
-                      <img src={user.picture} alt={userDisplayName} style={{width: '100%', height: '100%'}} />
-                    ) : (
-                      <span>{userInitial}</span>
-                    )}
-                  </div>
-                  <div className="account-meta">
-                    <div className="account-name">{userDisplayName}</div>
-                    <div className="account-plan">Plan: {planLabel}</div>
-                  </div>
-                  <span className="account-pill">{planLabel}</span>
-                </div>
-
-                {isAccountMenuOpen && (
-                  <div
-                    className="card"
-                    style={{
-                      position: 'absolute',
-                      bottom: 'calc(100% + 8px)',
-                      right: 0,
-                      minWidth: 220,
-                      padding: 8,
-                      border: '2px solid #2a2a2c',
-                      background: '#0f0f12',
-                      zIndex: 60,
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
-                    }}
-                  >
-                    <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setIsAccountMenuOpen(false)
-                          pushToast('기능 준비 중입니다.', 'info')
-                        }}
-                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
-                      >
-                        계정 관리
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setIsAccountMenuOpen(false)
-                          pushToast('기능 준비 중입니다.', 'info')
-                        }}
-                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
-                      >
-                        개인 설정
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setIsAccountMenuOpen(false)
-                          openSettingsPanel()
-                        }}
-                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
-                      >
-                        설정
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setIsAccountMenuOpen(false)
-                          pushToast('기능 준비 중입니다.', 'info')
-                        }}
-                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
-                      >
-                        도움말
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setIsAccountMenuOpen(false)
-                          onLogout()
-                        }}
-                        style={{width: '100%', justifyContent: 'flex-start', textAlign: 'left'}}
-                      >
-                        로그아웃
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="account-bar" onClick={onLogin} role="button" tabIndex={0}>
-                <div className="account-avatar">?</div>
-                <div className="account-meta">
-                  <div className="account-name">로그인</div>
-                  <div className="account-plan">계정을 연결하세요</div>
-                </div>
-                <span className="account-pill">Sign in</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Center panel */}
-      <div className="card scroll-hide" style={{padding:8, overflow:'auto', display:'flex', flexDirection:'column', gap:8}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10}}>
-          <div style={{display:'flex', flexDirection:'column', gap:6}}>
-            <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
-              <div style={{fontSize:16, fontWeight:700, lineHeight:1}}>{activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}</div>
-            </div>
-            <div
-              onMouseEnter={onLegendEnter}
-              onMouseLeave={onLegendLeave}
-              style={{position: 'relative', display: 'inline-flex', alignItems: 'center'}}
-            >
-              <span style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#cfcfd6',
-                padding: '3px 8px',
-                borderRadius: 8,
-                border: '1px solid #2a2a2c',
-                background: '#16161a'
-              }}>
-                페르소나 구성
-              </span>
-
-              {isLegendOpen && (
-                <div
-                  className="card"
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 6px)',
-                    left: 0,
-                    minWidth: 180,
-                    padding: 10,
-                    border: '2px solid #2a2a2c',
-                    background: '#0f0f12',
-                    zIndex: 60,
-                    boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
-                  }}
-                >
-                  <div style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#888',
-                    marginBottom: 8,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5
-                  }}>
-                    Agents by Color
-                  </div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
-                    {PERSONA_LEGEND.map(item => (
-                      <div key={item.key} style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                        <span style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 3,
-                          background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
-                          border: '1px solid #444'
-                        }} />
-                        <span className="mono" style={{fontSize: 12, color: '#cfcfd6'}}>
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/*  실행 버튼 조금 왼쪽 + 내보내기 hover 메뉴 */}
-          <div style={{display:'flex', alignItems:'center', gap:10, marginRight: 8}}>
-            {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
-
-            <button
-              className="btn"
-              onClick={onRunAnalysis}
-              disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
-              style={{
-                opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
-                cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
-                marginRight: 6
-              }}
-            >
-              {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
-            </button>
-
-            <div
-              onMouseEnter={onDownloadEnter}
-              onMouseLeave={onDownloadLeave}
-              style={{ position: 'relative' }}
-            >
-              <button
-                className="btn"
-                type="button"
-                disabled={!activeDoc}
-                style={{
-                  opacity: !activeDoc ? 0.6 : 1,
-                  cursor: !activeDoc ? 'not-allowed' : 'pointer',
-                  paddingLeft: 12,
-                  paddingRight: 12
-                }}
-                title="내보내기"
-              >
-                내보내기
-              </button>
-
-              {isDownloadOpen && activeDoc && (
-                <div
-                  className="card"
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: 0,
-                    minWidth: 180,
-                    padding: 8,
-                    border: '2px solid #2a2a2c',
-                    background: '#0f0f12',
-                    zIndex: 50,
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
-                  }}
-                >
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => { setIsDownloadOpen(false); exportAsTxt() }}
-                    style={{
-                      width: '100%',
-                      justifyContent: 'flex-start',
-                      textAlign: 'left',
-                      marginBottom: 6
-                    }}
-                  >
-                    txt로 내보내기
-                  </button>
-
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => { setIsDownloadOpen(false); exportAsDocx() }}
-                    style={{
-                      width: '100%',
-                      justifyContent: 'flex-start',
-                      textAlign: 'left'
-                    }}
-                  >
-                    docx로 내보내기
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
-
-        <div className="scroll-hide" style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
-          {activeDoc ? (
-            activeAnalysis?.result?.split_sentences ? (
-               <div className="mono" style={{paddingBottom: 40}}>
-                 <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} />
-               </div>
-            ) : (
-              <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
-                {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
-              </pre>
-            )
-          ) : (
-            <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
-          )}
-        </div>
-
-        {/* Draft input */}
-        <div className="card" style={{padding:12, background:'#141417', border:'3px solid #2a2a2c'}}>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:8}}>
-            <div style={{fontWeight:700}}>텍스트 입력</div>
-            <button
-              className="btn"
-              onClick={onSaveDraft}
-              disabled={isSavingDraft || isUploading || isAnalyzing}
-              style={{
-                opacity: (isSavingDraft || isUploading || isAnalyzing) ? 0.7 : 1,
-                cursor: (isSavingDraft || isUploading || isAnalyzing) ? 'not-allowed' : 'pointer',
-              }}
-              title={isSavingDraft ? '저장 중…' : '입력한 텍스트를 .txt로 저장'}
-            >
-              {isSavingDraft ? '저장 중…' : '저장'}
-            </button>
-          </div>
-
-          <textarea
-            value={draftText}
-            onChange={(e) => setDraftText(e.target.value)}
-            placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
-            className="mono"
-            style={{
-              width: '96%',
-              height: 140,
-              resize: 'vertical',
-              borderRadius: 8,
-              border: '1px solid #2a2a2c',
-              background: '#0f0f12',
-              color: '#e6e6ea',
-              padding: 10,
-              outline: 'none',
-              lineHeight: 1.5,
-              fontSize: 12
-            }}
-          />
-          <div className="muted" style={{fontSize:11, marginTop:8}}>
-            저장 시 파일명은 자동으로 <span className="mono">draft_YYYYMMDD_HHMMSS.txt</span> 형태로 생성됩니다.
-          </div>
-        </div>
-      </div>
-
-      {/* Right panel */}
-      <div className="card scroll-hide" style={{padding:8, overflow:'auto'}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
-          <div>
-            <div style={{fontSize:16, fontWeight:700}}>분석 결과</div>
-            <div className="muted" style={{fontSize:12}}>
-              {activeAnalysis ? `mode: ${mode}` : '분석을 실행하거나 기록을 선택하세요.'}
-            </div>
-          </div>
-
-          <div style={{display:'flex', gap:8, alignItems:'center'}}>
-            {readerLevel && <Badge>독자 수준: {readerLevel}</Badge>}
-
-            {canShowJson && rightView === 'report' && (
-              <button className="btn" onClick={() => setRightView('json')} disabled={!activeAnalysis}>
-                JSON 파일로 보기
-              </button>
-            )}
-
-            {canShowJson && rightView === 'json' && (
-              <button className="btn" onClick={() => setRightView('report')}>
-                돌아오기
-              </button>
-            )}
-          </div>
-        </div>
-
-        {!activeAnalysis && (
-          <div className="muted" style={{marginTop:14, fontSize:13}}>
-            오른쪽 패널에는 에이전트들의 결과(JSON)가 표시됩니다. <br/>
-            UPSTAGE_API_KEY가 없으면 로컬 휴리스틱 모드로 동작합니다.
-          </div>
-        )}
-
-        {activeAnalysis && (
-          <div style={{marginTop:12}}>
-            {rightView === 'report' && (
-              <>
-                {reportMarkdown ? (
-                  <div className="card" style={{padding:16, background:'#202022', marginBottom:12}}>
-                    <div style={{fontWeight:700, marginBottom:12, borderBottom:'1px solid #444', paddingBottom:8, fontSize:14}}>
-                      📝 종합 분석 리포트 (Chief Editor)
-                    </div>
-                    <div className="markdown-body" style={{fontSize:14, lineHeight:1.6}}>
-                      <ReactMarkdown>{reportMarkdown}</ReactMarkdown>
-                    </div>
-                  </div>
+        marginTop: 12,
+        paddingTop: 10,
+        borderTop: '1px solid #333'
+      }}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+          {user ? (
+            <div className="account-bar">
+              <div className="account-avatar">
+                {user.picture ? (
+                  <img src={user.picture} alt={userDisplayName} style={{width: '100%', height: '100%'}} />
                 ) : (
-                  <div className="card" style={{padding:12, marginBottom:12}}>
-                    <div style={{fontWeight:700}}>요약</div>
-                    <div className="muted" style={{fontSize:13, marginTop:6}}>
-                      {activeAnalysis.result?.aggregate?.summary || '—'}
-                    </div>
-                  </div>
+                  <span>{userInitial}</span>
                 )}
-              </>
+              </div>
+              <div className="account-meta">
+                <div className="account-name">{userDisplayName}</div>
+                <div className="account-plan"></div>
+              </div>
+
+            </div>
+          ) : (
+            <div className="account-bar" onClick={onLogin} role="button" tabIndex={0} style={{cursor:'pointer'}}>
+              <div className="account-avatar">?</div>
+              <div className="account-meta">
+                <div className="account-name">Login</div>
+                <div className="account-plan">Connect account</div>
+              </div>
+              <span className="account-pill">Sign in</span>
+            </div>
+          )}
+
+          <div style={{display: 'flex', gap: 8}}>
+            <button
+              className="btn"
+              type="button"
+              onClick={onLogout}
+              title="Logout"
+              aria-label="Logout"
+              disabled={!user}
+              style={{
+                width: 38,
+                height: 38,
+                display: 'grid',
+                placeItems: 'center',
+                opacity: user ? 1 : 0.45,
+                cursor: user ? 'pointer' : 'not-allowed'
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <path d="M10 17l5-5-5-5" />
+                <path d="M15 12H3" />
+              </svg>
+            </button>
+
+            <button
+              className="btn"
+              type="button"
+              onClick={openSettingsPanel}
+              title="Settings"
+              aria-label="Settings"
+              aria-pressed={leftMode === 'settings'}
+              style={{
+                width: 38,
+                height: 38,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: -4,
+                background: leftMode === 'settings' ? '#2a2a2c' : undefined
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      </div>
+
+        <div style={{display:'contents'}}>
+          {/* Center panel */}
+          <div className="card scroll-hide" style={{padding:8, overflow:'auto', display:'flex', flexDirection:'column', gap:8}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10}}>
+              <div style={{display:'flex', flexDirection:'column', gap:6}}>
+                <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
+                  <div style={{fontSize:16, fontWeight:700, lineHeight:1}}>{activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}</div>
+                </div>
+                <div
+                  onMouseEnter={onLegendEnter}
+                  onMouseLeave={onLegendLeave}
+                  style={{position: 'relative', display: 'inline-flex', alignItems: 'center'}}
+                >
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#cfcfd6',
+                    padding: '3px 8px',
+                    borderRadius: 8,
+                    border: '1px solid #2a2a2c',
+                    background: '#16161a'
+                  }}>
+                    페르소나 구성
+                  </span>
+
+                  {isLegendOpen && (
+                    <div
+                      className="card"
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        left: 0,
+                        minWidth: 180,
+                        padding: 10,
+                        border: '2px solid #2a2a2c',
+                        background: '#0f0f12',
+                        zIndex: 60,
+                        boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
+                      }}
+                    >
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#888',
+                        marginBottom: 8,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5
+                      }}>
+                        Agents by Color
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                        {PERSONA_LEGEND.map(item => (
+                          <div key={item.key} style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                            <span style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: 3,
+                              background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
+                              border: '1px solid #444'
+                            }} />
+                            <span className="mono" style={{fontSize: 12, color: '#cfcfd6'}}>
+                              {item.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 실행 버튼 조금 왼쪽 + 내보내기 hover 메뉴 */}
+              <div style={{display:'flex', alignItems:'center', gap:10, marginRight: 8}}>
+                {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
+
+                <button
+                  className="btn"
+                  onClick={onRunAnalysis}
+                  disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
+                  style={{
+                    opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
+                    cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
+                    marginRight: 6
+                  }}
+                >
+                  {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+                </button>
+
+                <div
+                  onMouseEnter={onDownloadEnter}
+                  onMouseLeave={onDownloadLeave}
+                  style={{ position: 'relative' }}
+                >
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={!activeDoc}
+                    style={{
+                      opacity: !activeDoc ? 0.6 : 1,
+                      cursor: !activeDoc ? 'not-allowed' : 'pointer',
+                      paddingLeft: 12,
+                      paddingRight: 12
+                    }}
+                    title="내보내기"
+                  >
+                    내보내기
+                  </button>
+
+                  {isDownloadOpen && activeDoc && (
+                    <div
+                      className="card"
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        right: 0,
+                        minWidth: 180,
+                        padding: 8,
+                        border: '2px solid #2a2a2c',
+                        background: '#0f0f12',
+                        zIndex: 50,
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
+                      }}
+                    >
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => { setIsDownloadOpen(false); exportAsTxt() }}
+                        style={{
+                          width: '100%',
+                          justifyContent: 'flex-start',
+                          textAlign: 'left',
+                          marginBottom: 6
+                        }}
+                      >
+                        txt로 내보내기
+                      </button>
+
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => { setIsDownloadOpen(false); exportAsDocx() }}
+                        style={{
+                          width: '100%',
+                          justifyContent: 'flex-start',
+                          textAlign: 'left'
+                        }}
+                      >
+                        docx로 내보내기
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
+
+            <div className="scroll-hide" style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
+              {activeDoc ? (
+                activeAnalysis?.result?.split_sentences ? (
+                   <div className="mono" style={{paddingBottom: 40}}>
+                     <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} />
+                   </div>
+                ) : (
+                  <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
+                    {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
+                  </pre>
+                )
+              ) : (
+                <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
+              )}
+            </div>
+
+            {/* Draft input */}
+            <div className="card" style={{padding:12, background:'#141417', border:'3px solid #2a2a2c'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:8}}>
+                <div style={{fontWeight:700}}>텍스트 입력</div>
+                <button
+                  className="btn"
+                  onClick={onSaveDraft}
+                  disabled={isSavingDraft || isUploading || isAnalyzing}
+                  style={{
+                    opacity: (isSavingDraft || isUploading || isAnalyzing) ? 0.7 : 1,
+                    cursor: (isSavingDraft || isUploading || isAnalyzing) ? 'not-allowed' : 'pointer',
+                  }}
+                  title={isSavingDraft ? '저장 중…' : '입력한 텍스트를 .txt로 저장'}
+                >
+                  {isSavingDraft ? '저장 중…' : '저장'}
+                </button>
+              </div>
+
+              <textarea
+                value={draftText}
+                onChange={(e) => setDraftText(e.target.value)}
+                placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
+                className="mono"
+                style={{
+                  width: '96%',
+                  height: 140,
+                  resize: 'vertical',
+                  borderRadius: 8,
+                  border: '1px solid #2a2a2c',
+                  background: '#0f0f12',
+                  color: '#e6e6ea',
+                  padding: 10,
+                  outline: 'none',
+                  lineHeight: 1.5,
+                  fontSize: 12
+                }}
+              />
+              <div className="muted" style={{fontSize:11, marginTop:8}}>
+                저장 시 파일명은 자동으로 <span className="mono">draft_YYYYMMDD_HHMMSS.txt</span> 형태로 생성됩니다.
+              </div>
+            </div>
+          </div>
+
+          {/* Right panel */}
+          <div className="card scroll-hide" style={{padding:8, overflow:'auto'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
+              <div>
+                <div style={{fontSize:16, fontWeight:700}}>분석 결과</div>
+                <div className="muted" style={{fontSize:12}}>
+                  {activeAnalysis ? `mode: ${mode}` : '분석을 실행하거나 기록을 선택하세요.'}
+                </div>
+              </div>
+
+              <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                {readerLevel && <Badge>독자 수준: {readerLevel}</Badge>}
+
+                {canShowJson && rightView === 'report' && (
+                  <button className="btn" onClick={() => setRightView('json')} disabled={!activeAnalysis}>
+                    JSON 파일로 보기
+                  </button>
+                )}
+
+                {canShowJson && rightView === 'json' && (
+                  <button className="btn" onClick={() => setRightView('report')}>
+                    돌아오기
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!activeAnalysis && (
+              <div className="muted" style={{marginTop:14, fontSize:13}}>
+                오른쪽 패널에는 에이전트들의 결과(JSON)가 표시됩니다. <br/>
+                UPSTAGE_API_KEY가 없으면 로컬 휴리스틱 모드로 동작합니다.
+              </div>
             )}
 
-            {rightView === 'json' && (
-              <div className="card" style={{padding:12}}>
-                <div style={{fontWeight:700, marginBottom:8}}>Raw JSON</div>
-                <pre className="mono" style={{whiteSpace:'pre-wrap', fontSize:12, lineHeight:1.5}}>
-                  {pretty(activeAnalysis.result)}
-                </pre>
+            {activeAnalysis && (
+              <div style={{marginTop:12}}>
+                {rightView === 'report' && (
+                  <>
+                    {reportMarkdown ? (
+                      <div className="card" style={{padding:16, background:'#202022', marginBottom:12}}>
+                        <div style={{fontWeight:700, marginBottom:12, borderBottom:'1px solid #444', paddingBottom:8, fontSize:14}}>
+                          📝 종합 분석 리포트 (Chief Editor)
+                        </div>
+                        <div className="markdown-body" style={{fontSize:14, lineHeight:1.6}}>
+                          <ReactMarkdown>{reportMarkdown}</ReactMarkdown>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="card" style={{padding:12, marginBottom:12}}>
+                        <div style={{fontWeight:700}}>요약</div>
+                        <div className="muted" style={{fontSize:13, marginTop:6}}>
+                          {activeAnalysis.result?.aggregate?.summary || '—'}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {rightView === 'json' && (
+                  <div className="card" style={{padding:12}}>
+                    <div style={{fontWeight:700, marginBottom:8}}>Raw JSON</div>
+                    <pre className="mono" style={{whiteSpace:'pre-wrap', fontSize:12, lineHeight:1.5}}>
+                      {pretty(activeAnalysis.result)}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
     </>
   )
 }
