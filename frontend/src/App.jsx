@@ -47,10 +47,18 @@ const ISSUE_COLORS = {
   default: 'rgba(158, 158, 158, 0.35)'
 }
 
-function HighlightedText({ text, analysisResult }) {
+function HighlightedText({ text, analysisResult, setTooltip }) {
   const rawHighlights = Array.isArray(analysisResult?.highlights) ? analysisResult.highlights : []
   const rawNormalized = Array.isArray(analysisResult?.normalized_issues) ? analysisResult.normalized_issues : []
   const hasDocHighlights = rawHighlights.length > 0 || rawNormalized.length > 0
+
+  const handleMouseLeave = () => {
+    setTooltip(prev => ({ ...prev, visible: false }))
+  }
+
+  const handleMouseMove = (e) => {
+    setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))
+  }
 
   if (hasDocHighlights && typeof text === 'string') {
     const textLen = text.length
@@ -87,7 +95,7 @@ function HighlightedText({ text, analysisResult }) {
     })
 
     if (highlightItems.length === 0) {
-      return <div style={{whiteSpace:'pre-wrap', lineHeight:1.6}}>{text}</div>
+      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
     }
 
     const boundaries = new Set([0, textLen])
@@ -107,8 +115,33 @@ function HighlightedText({ text, analysisResult }) {
       segments.push({ start, end, text: segmentText, issues })
     }
 
+    const handleMouseEnter = (e, issues) => {
+      const content = (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {issues.map((issue, i) => {
+            const agent = issue.agent || 'unknown'
+            const reasonText = issue.reason || ''
+            return (
+              <div key={i}>
+                <strong style={{
+                  textTransform: 'capitalize',
+                  color: ISSUE_COLORS[agent] ? '#fff' : '#cfcfd6',
+                  background: ISSUE_COLORS[agent] || 'transparent',
+                  padding: '1px 4px',
+                  borderRadius: 3,
+                  marginRight: 4
+                }}>{agent}</strong>
+                <span style={{ opacity: 0.8 }}>{reasonText}</span>
+              </div>
+            )
+          })}
+        </div>
+      )
+      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+    }
+
     return (
-      <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
+      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
         {segments.map(segment => {
           if (!segment.issues.length) {
             return <span key={`${segment.start}-${segment.end}`}>{segment.text}</span>
@@ -121,19 +154,14 @@ function HighlightedText({ text, analysisResult }) {
           })
           const primary = sortedIssues[0]
           const color = ISSUE_COLORS[primary.agent] || ISSUE_COLORS.default
-          const title = sortedIssues.map(issue => {
-            const agent = issue.agent || 'unknown'
-            const severity = issue.severity ? ` (${issue.severity})` : ''
-            const label = issue.label || 'issue'
-            const reason = issue.reason ? ` - ${issue.reason}` : ''
-            return `${agent}${severity}: ${label}${reason}`
-          }).join('\n')
 
           return (
             <mark
               key={`${segment.start}-${segment.end}`}
-              style={{backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2}}
-              title={title}
+              style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
+              onMouseEnter={(e) => handleMouseEnter(e, sortedIssues)}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
             >
               {segment.text}
             </mark>
@@ -144,14 +172,12 @@ function HighlightedText({ text, analysisResult }) {
   }
 
   if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
-    return <div style={{whiteSpace:'pre-wrap', lineHeight:1.6}}>{text}</div>
+    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
   }
 
+  // ... (fallback logic, can be updated later if needed)
   const sentences = analysisResult.split_sentences
-  // Aggregate all issues from different agents
   let allIssues = []
-
-  // Helper to collect issues
   const collect = (source, type) => {
     if (source?.issues && Array.isArray(source.issues)) {
       source.issues.forEach(issue => {
@@ -159,18 +185,31 @@ function HighlightedText({ text, analysisResult }) {
       })
     }
   }
-
-  const logicSource = analysisResult.logic || analysisResult.causality
-  if (logicSource) {
-    collect(logicSource, analysisResult.logic ? 'logic' : 'causality')
-  }
   collect(analysisResult.tone, 'tone')
+  collect(analysisResult.logic, 'logic')
+  collect(analysisResult.causality, 'causality')
   collect(analysisResult.trauma, 'trauma')
   collect(analysisResult.hate_bias, 'hate_bias')
   collect(analysisResult.genre_cliche, 'genre_cliche')
-  collect(analysisResult.cliche, 'cliche')
   collect(analysisResult.spelling, 'spelling')
-  collect(analysisResult.tension_curve || analysisResult.tension, 'tension')
+  collect(analysisResult.tension_curve, 'tension')
+
+  const handleMouseEnterSimple = (e, issue) => {
+    const content = (
+      <div>
+        <strong style={{
+          textTransform: 'capitalize',
+          color: '#fff',
+          background: ISSUE_COLORS[issue.type] || ISSUE_COLORS.default,
+          padding: '1px 4px',
+          borderRadius: 3,
+          marginRight: 4
+        }}>{issue.type}</strong>
+        <span>{issue.reason || issue.suggestion || 'Issue found'}</span>
+      </div>
+    )
+    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+  }
 
   const issuesBySentence = {}
   allIssues.forEach(issue => {
@@ -183,20 +222,13 @@ function HighlightedText({ text, analysisResult }) {
   })
 
   return (
-    <div style={{whiteSpace:'pre-wrap', lineHeight:1.8, fontSize:13}}>
+    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
-        // If no issues, return sentence as is (plus a space usually)
         if (sentIssues.length === 0) {
           return <span key={idx}>{sent} </span>
         }
 
-        // Simple highlighting: just highlight the whole sentence if it has issues for now
-        // OR (Advanced): Split sentence by char_start/char_end.
-        // Let's do a simpler version first: Highlight specific ranges if non-overlapping.
-        // For robustness in this MVP, we'll sort issues by start char and try to highlight.
-
-        // Sort by start position
         sentIssues.sort((a, b) => (a.char_start || 0) - (b.char_start || 0))
 
         let lastIndex = 0
@@ -211,10 +243,14 @@ function HighlightedText({ text, analysisResult }) {
           }
 
           const color = ISSUE_COLORS[issue.type] || ISSUE_COLORS.default
-          const title = `${issue.type.toUpperCase()}: ${issue.reason || issue.suggestion || 'Issue found'}`
-
           fragments.push(
-            <mark key={`iss-${i}`} style={{backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2}} title={title}>
+            <mark
+              key={`iss-${i}`}
+              style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
+              onMouseEnter={(e) => handleMouseEnterSimple(e, issue)}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
               {sent.slice(start, end)}
             </mark>
           )
@@ -223,11 +259,11 @@ function HighlightedText({ text, analysisResult }) {
         })
 
         if (lastIndex < sent.length) {
-          fragments.push(<span key={`end`}>{sent.slice(lastIndex)}</span>)
+          fragments.push(<span key="end">{sent.slice(lastIndex)}</span>)
         }
 
         return (
-          <span key={idx} style={{marginRight: 4}}>
+          <span key={idx} style={{ marginRight: 4 }}>
             {fragments}
           </span>
         )
@@ -257,6 +293,70 @@ function makeTimestampName(prefix = 'note') {
   const mi = pad2(d.getMinutes())
   const s = pad2(d.getSeconds())
   return `${prefix}_${y}${mo}${da}_${h}${mi}${s}`
+}
+
+function formatDisplayTimestamp(value) {
+  if (!value) return ''
+  const raw = String(value).trim()
+  const tzPattern = /([zZ]|[+\-]\d{2}:?\d{2})$/
+  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+
+  let dateStringToParse = raw
+  if (baseMatch && !tzPattern.test(raw)) {
+    // 타임존 정보가 없는 timestamp는 UTC로 간주 (ISO 8601 형식)
+    dateStringToParse = raw.replace(' ', 'T') + 'Z'
+  }
+
+  const parsed = new Date(dateStringToParse)
+  if (Number.isNaN(parsed.getTime())) return raw
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(parsed).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value
+    return acc
+  }, {})
+  if (!parts.year) return raw
+  return `${parts.year}-${parts.month}-${parts.day}   ${parts.hour}:${parts.minute}:${parts.second}`
+}
+
+function scoreColor(score) {
+  if (score >= 80) return '#4caf50'
+  if (score >= 60) return '#ffb74d'
+  return '#f44336'
+}
+
+function Tooltip({ content, position, visible }) {
+  if (!visible || !content) return null
+  return (
+    <div style={{
+      position: 'fixed',
+      top: position.y + 12,
+      left: position.x + 12,
+      maxWidth: 320,
+      padding: '8px 12px',
+      background: '#1f1f23',
+      border: '1px solid #3a3a3f',
+      borderRadius: 8,
+      color: '#e6e6ea',
+      fontSize: 12,
+      lineHeight: 1.5,
+      whiteSpace: 'pre-wrap',
+      zIndex: 1500,
+      pointerEvents: 'none',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+      transition: 'opacity 0.1s ease',
+      opacity: visible ? 1 : 0,
+    }}>
+      {content}
+    </div>
+  )
 }
 
 const TOAST_STYLES = {
@@ -297,6 +397,7 @@ export default function App() {
   })
 
   const [toasts, setToasts] = useState([])
+  const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0 })
 
   const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -312,7 +413,7 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
-
+  const planLabel = ''
   const userDisplayName = user?.name || '사용자'
   const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
 
@@ -321,6 +422,12 @@ export default function App() {
   const downloadCloseTimer = useRef(null)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const legendCloseTimer = useRef(null)
+  const [docScoreOpenId, setDocScoreOpenId] = useState(null)
+  const [docScoreById, setDocScoreById] = useState({})
+  const [docScoreLoadingId, setDocScoreLoadingId] = useState(null)
+  const [docHistoryOpenId, setDocHistoryOpenId] = useState(null)
+  const [docHistoryById, setDocHistoryById] = useState({})
+  const [docHistoryLoadingId, setDocHistoryLoadingId] = useState(null)
 
   function pushToast(message, variant = 'info') {
     const id = (toastIdRef.current += 1)
@@ -387,6 +494,13 @@ export default function App() {
       setRightView('report')
     }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [activeDocId])
+
+  useEffect(() => {
+    if (!activeAnalysis?.document_id) return
+    const scores = activeAnalysis?.result?.qa_scores
+    if (!scores) return
+    setDocScoreById(prev => ({ ...prev, [activeAnalysis.document_id]: scores }))
+  }, [activeAnalysis])
 
   useEffect(() => {
     if (!isAnalyzing) {
@@ -523,6 +637,61 @@ export default function App() {
     }
   }
 
+  async function onOpenDocScore(docId) {
+    if (!docId) return
+    if (docScoreOpenId === docId) {
+      setDocScoreOpenId(null)
+      return
+    }
+
+    setDocScoreOpenId(docId)
+    if (docScoreById[docId]) return
+
+    setDocScoreLoadingId(docId)
+    try {
+      const list = await listAnalysesByDoc(docId)
+      if (!list.length) {
+        pushToast('분석 기록이 없습니다.', 'warning')
+        return
+      }
+      const latestId = list[0].id
+      const full = await getAnalysis(latestId)
+      const qaScores = full?.result?.qa_scores || {}
+      setDocScoreById(prev => ({ ...prev, [docId]: qaScores }))
+    } catch (err) {
+      pushToast('점수 정보를 불러오지 못했습니다.', 'error')
+    } finally {
+      setDocScoreLoadingId(null)
+    }
+  }
+
+  async function onToggleDocHistory(docId) {
+    if (!docId) return
+    if (docHistoryOpenId === docId) {
+      setDocHistoryOpenId(null)
+      return
+    }
+
+    setDocHistoryOpenId(docId)
+    setDocHistoryLoadingId(docId)
+    try {
+      const list = await listAnalysesByDoc(docId)
+      setDocHistoryById(prev => ({ ...prev, [docId]: list }))
+    } catch (err) {
+      pushToast('문서 기록을 불러오지 못했습니다.', 'error')
+    } finally {
+      setDocHistoryLoadingId(null)
+    }
+  }
+
+  async function onSelectDocAnalysis(docId, analysisId) {
+    if (!docId || !analysisId) return
+    setDocHistoryOpenId(null)
+    setDocScoreOpenId(docId)
+    await openAnalysis(analysisId)
+    setRightView('report')
+  }
+
   async function onDeleteAnalysis(id) {
     if (!id) return
     if (!window.confirm(`분석 결과를 삭제할까요?\n\n${id}`)) return
@@ -556,14 +725,39 @@ export default function App() {
     }
   }
 
+  async function openLatestDocScore(docId) {
+    if (!docId) return
+    setDocScoreOpenId(docId)
+    setDocScoreLoadingId(docId)
+    try {
+      const list = await listAnalysesByDoc(docId)
+      if (!list.length) {
+        pushToast('분석 기록이 없습니다.', 'warning')
+        return
+      }
+      const latestId = list[0].id
+      await openAnalysis(latestId)
+    } catch (err) {
+      pushToast('점수 정보를 불러오지 못했습니다.', 'error')
+    } finally {
+      setDocScoreLoadingId(null)
+    }
+  }
+
   const readerLevel = activeAnalysis?.result?.final_metric?.reader_level
   const mode = activeAnalysis?.result?.debug?.mode || (activeAnalysis ? 'upstage_pipeline' : null)
   const reportMarkdown = activeAnalysis?.result?.report?.full_report_markdown
-  const qaScores = activeAnalysis?.result?.qa_scores
   const canShowJson = !!activeAnalysis
+  const historyDoc = docHistoryOpenId ? docs.find(doc => doc.id === docHistoryOpenId) : null
 
   function openUploadPanel() {
     setLeftMode('upload')
+    setIsDragOver(false)
+    setError(null)
+  }
+
+  function openSettingsPanel() {
+    setLeftMode(prev => (prev === 'settings' ? 'list' : 'settings'))
     setIsDragOver(false)
     setError(null)
   }
@@ -597,25 +791,21 @@ export default function App() {
     await uploadOneFile(file)
   }
 
-  function openSettingsPanel() {
-    setLeftMode(prev => (prev === 'settings' ? 'list' : 'settings'))
-    setIsDragOver(false)
-    setError(null)
-  }
 
-  function SettingsIcon() {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
-        <path
-          d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
+function SettingsIcon({ size = 28 }) {
+  return (
+
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 
   // toggle sizes
@@ -710,6 +900,7 @@ export default function App() {
 
   return (
     <>
+      <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} />
       <style>{`
         body {
           scrollbar-width: none;
@@ -737,10 +928,13 @@ export default function App() {
           border-radius: 12px;
           background: #141417;
           color: #e6e6ea;
-          cursor: default;
+          cursor: pointer;
           transition: background 0.18s ease, border-color 0.18s ease;
         }
-        /* Hover effect removed for account-bar since popup is gone */
+        .account-bar:hover {
+          background: #1b1b1f;
+          border-color: #3a3a3f;
+        }
         .account-avatar {
           width: 32px;
           height: 32px;
@@ -783,6 +977,34 @@ export default function App() {
           color: #cfcfd6;
           flex: 0 0 auto;
         }
+
+        .main-layout {
+          grid-template-areas: "left center right";
+        }
+        .left-panel { grid-area: left; }
+        .center-panel { grid-area: center; }
+        .right-panel { grid-area: right; }
+
+        @media (max-width: 1200px) {
+          .main-layout {
+            grid-template-columns: 300px 1fr;
+            grid-template-areas: "left center";
+          }
+          .right-panel {
+            display: none;
+          }
+        }
+        @media (max-width: 768px) {
+          .main-layout {
+            grid-template-columns: 1fr;
+            grid-template-areas: "center";
+            height: auto;
+            min-height: 100vh;
+          }
+          .left-panel {
+            display: none;
+          }
+        }
         @media (max-width: 640px) {
           .account-bar {
             padding: 6px 8px;
@@ -793,841 +1015,1022 @@ export default function App() {
           }
         }
       `}</style>
-      <div className="scroll-hide" style={{
-        display:'grid',
-        gridTemplateColumns:'300px 1fr 480px',
-        height:'100vh',
-        gap:8,
+      <div className="scroll-hide main-layout" style={{
+        display: 'grid',
+        gridTemplateColumns: '300px 1fr 480px',
+        height: '100vh',
+        gap: 8,
         background: '#0f0f12',
         filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
         transition: 'filter 0.2s ease'
       }}>
-      {/* Toast notifications */}
-      {toasts.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          zIndex: 1200,
-          pointerEvents: 'none'
-        }}>
-          {toasts.map(t => {
-            const style = TOAST_STYLES[t.variant] || TOAST_STYLES.info
-            return (
-              <div
-                key={t.id}
-                style={{
-                  border: `1px solid ${style.borderColor}`,
-                  background: style.background,
-                  color: '#e6e6ea',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  minWidth: 220,
-                  fontSize: 13,
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.35)'
-                }}
-              >
-                {t.message}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Floating QA score widget */}
-      {qaScores && Object.keys(qaScores).length > 0 && (
-        <div style={{
-          position: 'fixed',
-          bottom: 24,
-          left: 24,
-          background: 'rgba(27, 27, 31, 0.9)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid #333',
-          borderRadius: 8,
-          padding: '12px 16px',
-          zIndex: 1000,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-          minWidth: 160
-        }}>
+        {/* Toast notifications */}
+        {toasts.length > 0 && (
           <div style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: '#888',
-            marginBottom: 8,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5
+            position: 'fixed',
+            top: 24,
+            right: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            zIndex: 1200,
+            pointerEvents: 'none'
           }}>
-            Agent QA Scores
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
-            {Object.entries(qaScores).map(([name, score]) => (
-              <div key={name} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20}}>
-                <span style={{fontSize: 13, color: '#cfcfd6', textTransform: 'capitalize'}}>
-                  {name.replace('_', ' ')}
-                </span>
-                <span style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: score >= 80 ? '#4caf50' : score >= 60 ? '#ffb74d' : '#f44336'
-                }}>
-                  {score}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Left panel (Sidebar) */}
-      <div className="card" style={{padding:8, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0}}>
-
-        {/* Header + Upload button */}
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
-          <div>
-            <div style={{fontSize:18, fontWeight:700}}>CONTEXTOR</div>
-            <div className="muted" style={{fontSize:12}}>PDF/DOCX/HWP 업로드</div>
-          </div>
-
-          <button
-            className="btn"
-            onClick={openUploadPanel}
-            disabled={isUploading}
-            style={{opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer'}}
-            title={isUploading ? '업로드 중…' : '내부 저장소 업로드'}
-          >
-            업로드
-          </button>
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.docx,.txt,.md,.hwp,.hwpx"
-            onChange={onUpload}
-            style={{display:'none'}}
-            disabled={isUploading}
-          />
-        </div>
-
-        <div style={{marginTop:12, display:'flex', gap:8, flexWrap:'wrap'}}>
-          {loading ? <Badge>loading</Badge> : <Badge>ready</Badge>}
-          {docs.length ? <Badge>{docs.length} docs</Badge> : <Badge>no docs</Badge>}
-          {isUploading && <Badge>uploading…</Badge>}
-          {isAnalyzing && <Badge>analyzing…</Badge>}
-          {isSavingDraft && <Badge>saving…</Badge>}
-        </div>
-
-        {/* scroll area */}
-        <div className="scroll-hide" style={{marginTop:14, flex:1, minHeight:0, overflow:'auto', paddingBottom:12}}>
-          {/* Upload panel */}
-          {leftMode === 'upload' && (
-            <div>
-              <div className="card" style={{
-                padding: 12,
-                border: '3px solid #2a2a2c',
-                background: 'rgba(46, 125, 50, 0.18)',
-                marginBottom: 10,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 10
-              }}>
-                <div>
-                  <div style={{fontWeight: 800, fontSize: 16}}>내부저장소</div>
-                  <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                    파일을 업로드하거나 드래그 앤 드롭하세요.
-                  </div>
-                </div>
-
-                <button
-                  className="btn"
-                  onClick={closeLeftPanelToList}
-                  disabled={isUploading}
+            {toasts.map(t => {
+              const style = TOAST_STYLES[t.variant] || TOAST_STYLES.info
+              return (
+                <div
+                  key={t.id}
                   style={{
-                    opacity: isUploading ? 0.7 : 1,
-                    cursor: isUploading ? 'not-allowed' : 'pointer',
-                    width: 100,
-                    height: 42,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    border: `1px solid ${style.borderColor}`,
+                    background: style.background,
+                    color: '#e6e6ea',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    minWidth: 220,
+                    fontSize: 13,
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.35)'
                   }}
-                  title="되돌아오기"
                 >
-                  돌아가기
-                </button>
-              </div>
-
-              <div
-                className="card"
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                style={{
-                  padding: 14,
-                  border: `3px dashed ${isDragOver ? '#6aa9ff' : '#2a2a2c'}`,
-                  background: isDragOver ? 'rgba(50, 100, 200, 0.22)' : 'rgba(50, 100, 200, 0.12)',
-                  minHeight: 220,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  gap: 10
-                }}
-              >
-                <div style={{fontSize: 13, fontWeight: 700}}>
-                  {isDragOver ? '여기에 놓으세요' : '마우스로 파일을 드래그해서 드랍하세요'}
+                  {t.message}
                 </div>
-                <div className="muted" style={{fontSize: 12}}>
-                  지원 확장자: <span className="mono">.pdf .docx .txt .md .hwp .hwpx</span>
-                </div>
-
-                <div style={{display:'flex', gap:10, alignItems:'center', marginTop: 6}}>
-                  <label
-                    className="btn"
-                    style={{
-                      display:'inline-flex',
-                      alignItems:'center',
-                      gap:8,
-                      opacity: isUploading ? 0.7 : 1,
-                      cursor: isUploading ? 'not-allowed' : 'pointer',
-                      pointerEvents: isUploading ? 'none' : 'auto',
-                    }}
-                    title={isUploading ? '업로드 중…' : '파일 선택'}
-                  >
-                    <span>{isUploading ? '업로드 중…' : '파일 선택'}</span>
-                    <input
-                      ref={uploaderFileRef}
-                      type="file"
-                      accept=".pdf,.docx,.txt,.md,.hwp,.hwpx"
-                      onChange={onUploadFromUploader}
-                      style={{display:'none'}}
-                      disabled={isUploading}
-                    />
-                  </label>
-
-                  {isUploading && (
-                    <div className="muted" style={{fontSize: 12}}>
-                      업로드중입니다… 잠시만 기다려주세요.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Settings panel */}
-          {leftMode === 'settings' && (
-            <div>
-              <div className="card" style={{
-                padding: 12,
-                border: '3px solid #2a2a2c',
-                background: '#141417',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 10
-              }}>
-                <div>
-                  <div style={{fontWeight: 800, fontSize: 16}}>설정</div>
-                  <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                    설정 내용은 나중에 추가할 것
-                  </div>
-                </div>
-              </div>
-
-              <div className="card" style={{
-                marginTop: 10,
-                padding: 14,
-                minHeight: 320,
-                border: '3px solid #2a2a2c',
-                background: '#0f0f12'
-              }}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: 18}}>
-
-                  <div style={{display:'flex', flexDirection:'column', gap: 10}}>
-                    <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', gap: 10}}>
-                      <div>
-                        <div style={{fontWeight: 800, fontSize: 16}}>페르소나 갯수</div>
-                        <div className="muted" style={{fontSize: 12}}>1(디폴트 3) 최대 5</div>
-                      </div>
-                      <span className="mono" style={{
-                        padding: '4px 10px',
-                        borderRadius: 10,
-                        border: '1px solid #2a2a2c',
-                        background: '#141417',
-                        fontSize: 13,
-                        fontWeight: 900,
-                        color: '#e6e6ea',
-                        minWidth: 44,
-                        textAlign: 'center'
-                      }}>
-                        {personaCount}명
-                      </span>
-                    </div>
-
-                    <div>
-                      <input
-                        type="range"
-                        min={1}
-                        max={5}
-                        step={1}
-                        value={personaCount}
-                        onChange={(e) => setPersonaCount(Number(e.target.value))}
-                        style={{width: '100%', boxSizing: 'border-box', padding: 0}}
-                      />
-                      <div style={{display:'flex', justifyContent:'space-between', marginTop: 6}}>
-                        <span className="muted" style={{fontSize: 11}}>1</span>
-                        <span className="muted" style={{fontSize: 11}}>5</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 12}}>
-                    <div>
-                      <div style={{fontWeight: 800, fontSize: 16}}>집중 모드</div>
-                      <div className="muted" style={{fontSize: 12}}>창의성 ↔ 직관성</div>
-                    </div>
-
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => setCreativeFocus(prev => !prev)}
-                      aria-pressed={creativeFocus}
-                      style={{
-                        minWidth: 150,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 10,
-                        padding: '6px 10px'
-                      }}
-                    >
-                      <span style={{fontSize: 12, fontWeight: 800}}>
-                        {creativeFocus ? '창의성 중심' : '직관성'}
-                      </span>
-
-                      <span aria-hidden="true" style={{
-                        width: SWITCH_W,
-                        height: SWITCH_H,
-                        borderRadius: 999,
-                        background: creativeFocus ? '#66bb6a' : '#555',
-                        position: 'relative',
-                        display: 'inline-block',
-                        padding: SWITCH_PAD,
-                        boxSizing: 'border-box',
-                        transition: 'background 0.18s ease',
-                        border: '1px solid #2a2a2c'
-                      }}>
-                        <span style={{
-                          width: KNOB,
-                          height: KNOB,
-                          borderRadius: '50%',
-                          background: '#0f0f12',
-                          display: 'block',
-                          transform: creativeFocus ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
-                          transition: 'transform 0.18s ease',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
-                        }} />
-                      </span>
-                    </button>
-                  </div>
-
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 12}}>
-                    <div>
-                      <div style={{fontWeight: 800, fontSize: 16}}>테마</div>
-                      <div className="muted" style={{fontSize: 12}}>Light / Dark</div>
-                    </div>
-
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
-                      aria-pressed={theme === 'light'}
-                      style={{
-                        minWidth: 150,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 10,
-                        padding: '6px 10px'
-                      }}
-                    >
-                      <span style={{fontSize: 12, fontWeight: 800}}>
-                        {theme === 'light' ? 'Light' : 'Dark'}
-                      </span>
-
-                      <span aria-hidden="true" style={{
-                        width: SWITCH_W,
-                        height: SWITCH_H,
-                        borderRadius: 999,
-                        background: theme === 'light' ? '#66bb6a' : '#555',
-                        position: 'relative',
-                        display: 'inline-block',
-                        padding: SWITCH_PAD,
-                        boxSizing: 'border-box',
-                        transition: 'background 0.18s ease',
-                        border: '1px solid #2a2a2c'
-                      }}>
-                        <span style={{
-                          width: KNOB,
-                          height: KNOB,
-                          borderRadius: '50%',
-                          background: '#0f0f12',
-                          display: 'block',
-                          transform: theme === 'light' ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
-                          transition: 'transform 0.18s ease',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
-                        }} />
-                      </span>
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* List panel */}
-          {leftMode === 'list' && (
-            <>
-              <div className="muted" style={{fontSize:12, marginBottom:8}}>원고 목록</div>
-              {docs.map(d => (
-                <div key={d.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
-                  <button
-                    className="btn"
-                    onClick={() => setActiveDocId(d.id)}
-                    style={{
-                      flex: 1,
-                      textAlign:'left',
-                      background: d.id===activeDocId ? '#1b1b1f' : undefined
-                    }}
-                  >
-                    <div style={{fontWeight:650}}>{d.title}</div>
-                    <div className="muted" style={{fontSize:12, marginTop:3}}>{d.filename}</div>
-                  </button>
-
-                  <button
-                    className="btn"
-                    title={isAnalyzing ? '분석 중에는 삭제할 수 없습니다.' : '삭제'}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteDoc(d.id) }}
-                    disabled={loading || isAnalyzing || isSavingDraft || isUploading}
-                    style={{width:56, display:'grid', placeItems:'center'}}
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))}
-
-              <div style={{marginTop:18}}>
-                <div className="muted" style={{fontSize:12, marginBottom:8}}>분석 기록</div>
-                {analyses.length === 0 && <div className="muted" style={{fontSize:13}}>아직 분석이 없습니다.</div>}
-                {analyses.map(a => (
-                  <div key={a.id} style={{display:'flex', gap:8, alignItems:'stretch', marginBottom:8}}>
-                    <button className="btn" onClick={() => openAnalysis(a.id)} style={{flex:1, textAlign:'left'}}>
-                      <div style={{display:'flex', justifyContent:'space-between', gap:10}}>
-                        <span className="mono" style={{fontSize:12}}>{a.id.slice(0,8)}…</span>
-                        <span className="muted" style={{fontSize:12}}>{a.status}</span>
-                      </div>
-                      <div className="muted" style={{fontSize:12, marginTop:3}}>{a.created_at}</div>
-                    </button>
-
-                    <button
-                      className="btn"
-                      title={isAnalyzing ? '분석 중에는 삭제할 수 없습니다.' : '삭제'}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteAnalysis(a.id) }}
-                      disabled={loading || isAnalyzing || isSavingDraft || isUploading}
-                      style={{width:56, display:'grid', placeItems:'center'}}
-                    >
-                      삭제
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Error banner */}
-        {error && (
-          <div className="card" style={{marginTop:12, padding:12, borderColor:'#5a2a2a', background:'#1a0f10'}}>
-            <div style={{fontWeight:700, marginBottom:6}}>Error</div>
-            <div className="mono" style={{fontSize:12, whiteSpace:'pre-wrap'}}>{error}</div>
+              )
+            })}
           </div>
         )}
 
-      {/* Footer: User & Settings */}
-      <div style={{
-        marginTop: 12,
-        paddingTop: 10,
-        borderTop: '1px solid #333'
-      }}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-          {user ? (
-            <div className="account-bar">
-              <div className="account-avatar">
-                {user.picture ? (
-                  <img src={user.picture} alt={userDisplayName} style={{width: '100%', height: '100%'}} />
-                ) : (
-                  <span>{userInitial}</span>
-                )}
-              </div>
-              <div className="account-meta">
-                <div className="account-name">{userDisplayName}</div>
-                <div className="account-plan"></div>
-              </div>
+        {/* Left panel */}
+        <div className="card left-panel" style={{ padding: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
+          {/* Header + Upload button */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>CONTEXTOR</div>
+              <div className="muted" style={{ fontSize: 12 }}>PDF/DOCX/HWP</div>
             </div>
-          ) : (
-            <div className="account-bar" onClick={onLogin} role="button" tabIndex={0} style={{cursor:'pointer'}}>
-              <div className="account-avatar">?</div>
-              <div className="account-meta">
-                <div className="account-name">Login</div>
-                <div className="account-plan">Connect account</div>
+
+            <button
+              className="btn"
+              onClick={openUploadPanel}
+              disabled={isUploading}
+              style={{ opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
+              title={isUploading ? '업로드 중…' : '내부 저장소 업로드'}
+            >
+              업로드
+            </button>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.docx,.txt,.md,.hwp,.hwpx"
+              onChange={onUpload}
+              style={{ display: 'none' }}
+              disabled={isUploading}
+            />
+          </div>
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {loading ? <Badge>loading</Badge> : <Badge>ready</Badge>}
+            {docs.length ? <Badge>{docs.length} docs</Badge> : <Badge>no docs</Badge>}
+            {isUploading && <Badge>uploading…</Badge>}
+            {isAnalyzing && <Badge>analyzing…</Badge>}
+            {isSavingDraft && <Badge>saving…</Badge>}
+          </div>
+
+          {/* scroll area */}
+          <div className="scroll-hide" style={{ marginTop: 14, flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 12 }}>
+            {/* Upload panel */}
+            {leftMode === 'upload' && (
+              <div>
+                <div className="card" style={{
+                  padding: 12,
+                  border: '3px solid #2a2a2c',
+                  background: 'rgba(46, 125, 50, 0.18)',
+                  marginBottom: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>내부저장소</div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      파일을 업로드하거나 드래그 앤 드롭하세요.
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn"
+                    onClick={closeLeftPanelToList}
+                    disabled={isUploading}
+                    style={{
+                      opacity: isUploading ? 0.7 : 1,
+                      cursor: isUploading ? 'not-allowed' : 'pointer',
+                      width: 100,
+                      height: 42,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title="되돌아오기"
+                  >
+                    돌아가기
+                  </button>
+                </div>
+
+                <div
+                  className="card"
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onDrop={onDrop}
+                  style={{
+                    padding: 14,
+                    border: `3px dashed ${isDragOver ? '#6aa9ff' : '#2a2a2c'}`,
+                    background: isDragOver ? 'rgba(50, 100, 200, 0.22)' : 'rgba(50, 100, 200, 0.12)',
+                    minHeight: 220,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    gap: 10
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>
+                    {isDragOver ? '여기에 놓으세요' : '마우스로 파일을 드래그해서 드랍하세요'}
+                  </div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    지원 확장자: <span className="mono">.pdf .docx .txt .md .hwp .hwpx</span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
+                    <label
+                      className="btn"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        opacity: isUploading ? 0.7 : 1,
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        pointerEvents: isUploading ? 'none' : 'auto',
+                      }}
+                      title={isUploading ? '업로드 중…' : '파일 선택'}
+                    >
+                      <span>{isUploading ? '업로드 중…' : '파일 선택'}</span>
+                      <input
+                        ref={uploaderFileRef}
+                        type="file"
+                        accept=".pdf,.docx,.txt,.md,.hwp,.hwpx"
+                        onChange={onUploadFromUploader}
+                        style={{ display: 'none' }}
+                        disabled={isUploading}
+                      />
+                    </label>
+
+                    {isUploading && (
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        업로드중입니다… 잠시만 기다려주세요.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <span className="account-pill">Sign in</span>
+            )}
+
+            {/* Settings panel */}
+            {leftMode === 'settings' && (
+              <div>
+                <div className="card" style={{
+                  padding: 12,
+                  border: '3px solid #2a2a2c',
+                  background: '#141417',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>설정</div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      설정 내용은 나중에 추가할 것
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card" style={{
+                  marginTop: 10,
+                  padding: 14,
+                  minHeight: 320,
+                  border: '3px solid #2a2a2c',
+                  background: '#0f0f12'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 16 }}>페르소나 갯수</div>
+                          <div className="muted" style={{ fontSize: 12 }}>1(디폴트 3) 최대 5</div>
+                        </div>
+                        <span className="mono" style={{
+                          padding: '4px 10px',
+                          borderRadius: 10,
+                          border: '1px solid #2a2a2c',
+                          background: '#141417',
+                          fontSize: 13,
+                          fontWeight: 900,
+                          color: '#e6e6ea',
+                          minWidth: 44,
+                          textAlign: 'center'
+                        }}>
+                          {personaCount}명
+                        </span>
+                      </div>
+
+                      <div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={5}
+                          step={1}
+                          value={personaCount}
+                          onChange={(e) => setPersonaCount(Number(e.target.value))}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: 0 }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                          <span className="muted" style={{ fontSize: 11 }}>1</span>
+                          <span className="muted" style={{ fontSize: 11 }}>5</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 16 }}>집중 모드</div>
+                        <div className="muted" style={{ fontSize: 12 }}>창의성 ↔ 직관성</div>
+                      </div>
+
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setCreativeFocus(prev => !prev)}
+                        aria-pressed={creativeFocus}
+                        style={{
+                          minWidth: 150,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          padding: '6px 10px'
+                        }}
+                      >
+                        <span style={{ fontSize: 12, fontWeight: 800 }}>
+                          {creativeFocus ? '창의성 중심' : '직관성'}
+                        </span>
+
+                        <span aria-hidden="true" style={{
+                          width: SWITCH_W,
+                          height: SWITCH_H,
+                          borderRadius: 999,
+                          background: creativeFocus ? '#66bb6a' : '#555',
+                          position: 'relative',
+                          display: 'inline-block',
+                          padding: SWITCH_PAD,
+                          boxSizing: 'border-box',
+                          transition: 'background 0.18s ease',
+                          border: '1px solid #2a2a2c'
+                        }}>
+                          <span style={{
+                            width: KNOB,
+                            height: KNOB,
+                            borderRadius: '50%',
+                            background: '#0f0f12',
+                            display: 'block',
+                            transform: creativeFocus ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
+                            transition: 'transform 0.18s ease',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
+                          }} />
+                        </span>
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 16 }}>테마</div>
+                        <div className="muted" style={{ fontSize: 12 }}>Light / Dark</div>
+                      </div>
+
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
+                        aria-pressed={theme === 'light'}
+                        style={{
+                          minWidth: 150,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          padding: '6px 10px'
+                        }}
+                      >
+                        <span style={{ fontSize: 12, fontWeight: 800 }}>
+                          {theme === 'light' ? 'Light' : 'Dark'}
+                        </span>
+
+                        <span aria-hidden="true" style={{
+                          width: SWITCH_W,
+                          height: SWITCH_H,
+                          borderRadius: 999,
+                          background: theme === 'light' ? '#66bb6a' : '#555',
+                          position: 'relative',
+                          display: 'inline-block',
+                          padding: SWITCH_PAD,
+                          boxSizing: 'border-box',
+                          transition: 'background 0.18s ease',
+                          border: '1px solid #2a2a2c'
+                        }}>
+                          <span style={{
+                            width: KNOB,
+                            height: KNOB,
+                            borderRadius: '50%',
+                            background: '#0f0f12',
+                            display: 'block',
+                            transform: theme === 'light' ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
+                            transition: 'transform 0.18s ease',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
+                          }} />
+                        </span>
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* List panel */}
+            {leftMode === 'list' && (
+              <>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>원고 목록</div>
+                {docs.map(d => (
+                  <div key={d.id} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setActiveDocId(d.id)
+                          openLatestDocScore(d.id)
+                        }}
+                        style={{
+                          flex: 1,
+                          textAlign: 'left',
+                          background: d.id === activeDocId ? '#1b1b1f' : undefined
+                        }}
+                      >
+                        <div style={{ fontWeight: 650 }}>{d.title}</div>
+                        <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>{d.filename}</div>
+                      </button>
+                    </div>
+
+                    {docScoreOpenId === d.id && (
+                      <div className="card" style={{ marginTop: 8, padding: 10, border: '1px solid #2a2a2c', background: '#141417' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#9aa0a6' }}>
+                            문서 점수 요약
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              className="btn"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onToggleDocHistory(d.id)
+                              }}
+                              disabled={loading || isAnalyzing || isSavingDraft || isUploading}
+                              style={{
+                                padding: '2px 6px',
+                                minWidth: 28,
+                                height: 24,
+                                display: 'grid',
+                                placeItems: 'center',
+                                background: 'rgba(46, 125, 50, 0.12)',
+                                border: '1px solid rgba(76, 175, 80, 0.55)',
+                                color: '#4caf50'
+                              }}
+                              title="문서 기록"
+                              aria-label="문서 기록"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path
+                                  d="M4 7c0-2 4-3 8-3s8 1 8 3-4 3-8 3-8-1-8-3Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                />
+                                <path
+                                  d="M4 7v6c0 2 4 3 8 3s8-1 8-3V7"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                />
+                                <path
+                                  d="M4 13v4c0 2 4 3 8 3s8-1 8-3v-4"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              className="btn"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onDeleteDoc(d.id)
+                              }}
+                              disabled={loading || isAnalyzing || isSavingDraft || isUploading}
+                              style={{
+                                padding: '2px 6px',
+                                minWidth: 28,
+                                height: 24,
+                                display: 'grid',
+                                placeItems: 'center',
+                                background: '#1a0f10',
+                                border: '1px solid rgba(239, 83, 80, 0.55)',
+                                color: '#ef5350'
+                              }}
+                              title="문서 삭제"
+                              aria-label="문서 삭제"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path
+                                  d="M4 7h16M9 7v-2.2c0-.7.6-1.3 1.3-1.3h3.4c.7 0 1.3.6 1.3 1.3V7M9.5 11.5v6M14.5 11.5v6M6.5 7l1 13.2c.1 1 1 1.8 2 1.8h5c1 0 1.9-.8 2-1.8L17.5 7"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {docScoreLoadingId === d.id && (
+                          <div className="muted" style={{ fontSize: 12 }}>불러오는 중...</div>
+                        )}
+                        {docScoreLoadingId !== d.id && (
+                          (() => {
+                            const scores = docScoreById[d.id] || {}
+                            const entries = Object.entries(scores).filter(([, value]) => typeof value === 'number')
+                            if (!entries.length) {
+                              return <div className="muted" style={{ fontSize: 12 }}>점수 데이터가 없습니다.</div>
+                            }
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {entries.map(([name, value]) => {
+                                  const safeScore = Math.max(0, Math.min(100, Math.round(value)))
+                                  const color = scoreColor(safeScore)
+                                  return (
+                                    <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <div style={{ width: 70, fontSize: 11, color: '#cfcfd6', textTransform: 'capitalize' }}>
+                                        {name.replace('_', ' ')}
+                                      </div>
+                                      <div style={{ flex: 1, height: 6, background: '#1b1b1f', borderRadius: 999, overflow: 'hidden' }}>
+                                        <div style={{ width: `${safeScore}%`, height: '100%', background: color }} />
+                                      </div>
+                                      <div style={{ width: 30, textAlign: 'right', fontSize: 11, color }}>
+                                        {safeScore}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="card" style={{ marginTop: 12, padding: 12, borderColor: '#5a2a2a', background: '#1a0f10' }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+              <div className="mono" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{error}</div>
             </div>
           )}
 
-          <div style={{display: 'flex', gap: 8}}>
-            <button
-              className="btn"
-              type="button"
-              onClick={onLogout}
-              title="Logout"
-              aria-label="Logout"
-              disabled={!user}
-              style={{
-                width: 38,
-                height: 38,
-                display: 'grid',
-                placeItems: 'center',
-                opacity: user ? 1 : 0.45,
-                cursor: user ? 'pointer' : 'not-allowed'
-              }}
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                <path d="M10 17l5-5-5-5" />
-                <path d="M15 12H3" />
-              </svg>
-            </button>
-
-            <button
-              className="btn"
-              type="button"
-              onClick={openSettingsPanel}
-              title="Settings"
-              aria-label="Settings"
-              aria-pressed={leftMode === 'settings'}
-              style={{
-                width: 38,
-                height: 38,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginLeft: -4,
-                background: leftMode === 'settings' ? '#2a2a2c' : undefined
-              }}
-            >
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      </div>
-
-        <div style={{display:'contents'}}>
-          {/* Center panel */}
-          <div className="card scroll-hide" style={{padding:8, overflow:'auto', display:'flex', flexDirection:'column', gap:8}}>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10}}>
-              <div style={{display:'flex', flexDirection:'column', gap:6}}>
-                <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
-                  <div style={{fontSize:16, fontWeight:700, lineHeight:1}}>{activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}</div>
+          {/* bottom bar */}
+          <div style={{
+            marginTop: 12,
+            paddingTop: 10,
+            borderTop: '1px solid #333'
+          }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              {user ? (
+                <div className="account-bar" style={{ flexGrow: 1 }}>
+                  <div className="account-avatar">
+                    {user.picture ? (
+                      <img src={user.picture} alt={userDisplayName} style={{ width: '100%', height: '100%' }} />
+                    ) : (
+                      <span>{userInitial}</span>
+                    )}
+                  </div>
+                  <div className="account-meta">
+                    <div className="account-name">{userDisplayName}</div>
+                    <div className="account-plan">{planLabel}</div>
+                  </div>
                 </div>
-                <div
-                  onMouseEnter={onLegendEnter}
-                  onMouseLeave={onLegendLeave}
-                  style={{position: 'relative', display: 'inline-flex', alignItems: 'center'}}
-                >
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: '#cfcfd6',
-                    padding: '3px 8px',
-                    borderRadius: 8,
-                    border: '1px solid #2a2a2c',
-                    background: '#16161a'
-                  }}>
-                    페르소나 구성
-                  </span>
-
-                  {isLegendOpen && (
-                    <div
-                      className="card"
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 6px)',
-                        left: 0,
-                        minWidth: 180,
-                        padding: 10,
-                        border: '2px solid #2a2a2c',
-                        background: '#0f0f12',
-                        zIndex: 60,
-                        boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
-                      }}
-                    >
-                      <div style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: '#888',
-                        marginBottom: 8,
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5
-                      }}>
-                        Agents by Color
-                      </div>
-                      <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
-                        {PERSONA_LEGEND.map(item => (
-                          <div key={item.key} style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                            <span style={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: 3,
-                              background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
-                              border: '1px solid #444'
-                            }} />
-                            <span className="mono" style={{fontSize: 12, color: '#cfcfd6'}}>
-                              {item.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+              ) : (
+                <div className="account-bar" onClick={onLogin} role="button" tabIndex={0} style={{ cursor: 'pointer', flexGrow: 1 }}>
+                  <div className="account-avatar">?</div>
+                  <div className="account-meta">
+                    <div className="account-name">Login</div>
+                    <div className="account-plan">Connect account</div>
+                  </div>
+                  <span className="account-pill">Sign in</span>
                 </div>
-              </div>
+              )}
 
-              {/* 실행 버튼 조금 왼쪽 + 내보내기 hover 메뉴 */}
-              <div style={{display:'flex', alignItems:'center', gap:10, marginRight: 8}}>
-                {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
-
-                <button
-                  className="btn"
-                  onClick={onRunAnalysis}
-                  disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
-                  style={{
-                    opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
-                    cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
-                    marginRight: 6
-                  }}
-                >
-                  {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
-                </button>
-
-                <div
-                  onMouseEnter={onDownloadEnter}
-                  onMouseLeave={onDownloadLeave}
-                  style={{ position: 'relative' }}
-                >
+              {user && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 0,
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingRight: 8
+                }}>
                   <button
                     className="btn"
                     type="button"
-                    disabled={!activeDoc}
+                    onClick={onLogout}
+                    title="Logout"
+                    aria-label="Logout"
+                    disabled={!user}
                     style={{
-                      opacity: !activeDoc ? 0.6 : 1,
-                      cursor: !activeDoc ? 'not-allowed' : 'pointer',
-                      paddingLeft: 12,
-                      paddingRight: 12
+                      width: 38,
+                      height: 38,
+                      display: 'grid',
+                      placeItems: 'center',
+                      opacity: user ? 1 : 0.45,
+                      cursor: user ? 'pointer' : 'not-allowed',
+                      background: 'darkred'
                     }}
-                    title="내보내기"
                   >
-                    내보내기
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <path d="M10 17l5-5-5-5" />
+                      <path d="M15 12H3" />
+                    </svg>
                   </button>
 
-                  {isDownloadOpen && activeDoc && (
-                    <div
-                      className="card"
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 8px)',
-                        right: 0,
-                        minWidth: 180,
-                        padding: 8,
-                        border: '2px solid #2a2a2c',
-                        background: '#0f0f12',
-                        zIndex: 50,
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
-                      }}
-                    >
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => { setIsDownloadOpen(false); exportAsTxt() }}
-                        style={{
-                          width: '100%',
-                          justifyContent: 'flex-start',
-                          textAlign: 'left',
-                          marginBottom: 6
-                        }}
-                      >
-                        txt로 내보내기
-                      </button>
-
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => { setIsDownloadOpen(false); exportAsDocx() }}
-                        style={{
-                          width: '100%',
-                          justifyContent: 'flex-start',
-                          textAlign: 'left'
-                        }}
-                      >
-                        docx로 내보내기
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={openSettingsPanel}
+                    title="Settings"
+                    aria-label="Settings"
+                    aria-pressed={leftMode === 'settings'}
+                    style={{
+                      width: 38,
+                      height: 38,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      background: leftMode === 'settings' ? '#2a2a2c' : undefined
+                    }}
+                  >
+                    {/* 아이콘 크기를 28로 설정하여 버튼(38px)에 꽉 차게 만듦 */}
+                    <SettingsIcon size={38} />
+                  </button>
                 </div>
-              </div>
-            </div>
-
-            {!user && <div style={{fontSize:10, color:'#ffab40'}}>* 전체 분석은 로그인 필요</div>}
-
-            <div className="scroll-hide" style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
-              {activeDoc ? (
-                activeAnalysis?.result?.split_sentences ? (
-                   <div className="mono" style={{paddingBottom: 40}}>
-                     <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} />
-                   </div>
-                ) : (
-                  <pre className="mono" style={{whiteSpace:'pre-wrap', lineHeight:1.5, fontSize:12}}>
-                    {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
-                  </pre>
-                )
-              ) : (
-                <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
               )}
             </div>
-
-            {/* Draft input */}
-            <div className="card" style={{padding:12, background:'#141417', border:'3px solid #2a2a2c'}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:8}}>
-                <div style={{fontWeight:700}}>텍스트 입력</div>
-                <button
-                  className="btn"
-                  onClick={onSaveDraft}
-                  disabled={isSavingDraft || isUploading || isAnalyzing}
-                  style={{
-                    opacity: (isSavingDraft || isUploading || isAnalyzing) ? 0.7 : 1,
-                    cursor: (isSavingDraft || isUploading || isAnalyzing) ? 'not-allowed' : 'pointer',
-                  }}
-                  title={isSavingDraft ? '저장 중…' : '입력한 텍스트를 .txt로 저장'}
-                >
-                  {isSavingDraft ? '저장 중…' : '저장'}
-                </button>
-              </div>
-
-              <textarea
-                value={draftText}
-                onChange={(e) => setDraftText(e.target.value)}
-                placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
-                className="mono"
-                style={{
-                  width: '96%',
-                  height: 140,
-                  resize: 'vertical',
-                  borderRadius: 8,
-                  border: '1px solid #2a2a2c',
-                  background: '#0f0f12',
-                  color: '#e6e6ea',
-                  padding: 10,
-                  outline: 'none',
-                  lineHeight: 1.5,
-                  fontSize: 12
-                }}
-              />
-              <div className="muted" style={{fontSize:11, marginTop:8}}>
-                저장 시 파일명은 자동으로 <span className="mono">draft_YYYYMMDD_HHMMSS.txt</span> 형태로 생성됩니다.
-              </div>
-            </div>
           </div>
+        </div>
 
-          {/* Right panel */}
-          <div className="card scroll-hide" style={{padding:8, overflow:'auto'}}>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:10}}>
-              <div>
-                <div style={{fontSize:16, fontWeight:700}}>분석 결과</div>
-                <div className="muted" style={{fontSize:12}}>
-                  {activeAnalysis ? `mode: ${mode}` : '분석을 실행하거나 기록을 선택하세요.'}
+        {/* Center panel */}
+        <div className="card scroll-hide center-panel" style={{ padding: 8, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>
+                  {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
                 </div>
               </div>
+              <div
+                onMouseEnter={onLegendEnter}
+                onMouseLeave={onLegendLeave}
+                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+              >
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#cfcfd6',
+                  padding: '3px 8px',
+                  borderRadius: 8,
+                  border: '1px solid #2a2a2c',
+                  background: '#16161a'
+                }}>
+                  에이전트
+                </span>
 
-              <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                {readerLevel && <Badge>독자 수준: {readerLevel}</Badge>}
-
-                {canShowJson && rightView === 'report' && (
-                  <button className="btn" onClick={() => setRightView('json')} disabled={!activeAnalysis}>
-                    JSON 파일로 보기
-                  </button>
-                )}
-
-                {canShowJson && rightView === 'json' && (
-                  <button className="btn" onClick={() => setRightView('report')}>
-                    돌아오기
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {!activeAnalysis && (
-              <div className="muted" style={{marginTop:14, fontSize:13}}>
-                오른쪽 패널에는 에이전트들의 결과(JSON)가 표시됩니다. <br/>
-                UPSTAGE_API_KEY가 없으면 로컬 휴리스틱 모드로 동작합니다.
-              </div>
-            )}
-
-            {activeAnalysis && (
-              <div style={{marginTop:12}}>
-                {rightView === 'report' && (
-                  <>
-                    {reportMarkdown ? (
-                      <div className="card" style={{padding:16, background:'#202022', marginBottom:12}}>
-                        <div style={{fontWeight:700, marginBottom:12, borderBottom:'1px solid #444', paddingBottom:8, fontSize:14}}>
-                          📝 종합 분석 리포트 (Chief Editor)
+                {isLegendOpen && (
+                  <div
+                    className="card"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      left: 0,
+                      minWidth: 180,
+                      padding: 10,
+                      border: '2px solid #2a2a2c',
+                      background: '#0f0f12',
+                      zIndex: 60,
+                      boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
+                    }}
+                  >
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#888',
+                      marginBottom: 8,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5
+                    }}>
+                      Agents by Color
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {PERSONA_LEGEND.map(item => (
+                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 3,
+                            background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
+                            border: '1px solid #444'
+                          }} />
+                          <span className="mono" style={{ fontSize: 12, color: '#cfcfd6' }}>
+                            {item.label}
+                          </span>
                         </div>
-                        <div className="markdown-body" style={{fontSize:14, lineHeight:1.6}}>
-                          <ReactMarkdown>{reportMarkdown}</ReactMarkdown>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="card" style={{padding:12, marginBottom:12}}>
-                        <div style={{fontWeight:700}}>요약</div>
-                        <div className="muted" style={{fontSize:13, marginTop:6}}>
-                          {activeAnalysis.result?.aggregate?.summary || '—'}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {rightView === 'json' && (
-                  <div className="card" style={{padding:12}}>
-                    <div style={{fontWeight:700, marginBottom:8}}>Raw JSON</div>
-                    <pre className="mono" style={{whiteSpace:'pre-wrap', fontSize:12, lineHeight:1.5}}>
-                      {pretty(activeAnalysis.result)}
-                    </pre>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* 실행 버튼 + 내보내기 hover 메뉴 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 8 }}>
+              {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
+
+              <button
+                className="btn"
+                onClick={onRunAnalysis}
+                disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
+                style={{
+                  opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
+                  cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
+                  marginRight: 6
+                }}
+              >
+                {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+              </button>
+
+              <div
+                onMouseEnter={onDownloadEnter}
+                onMouseLeave={onDownloadLeave}
+                style={{ position: 'relative' }}
+              >
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={!activeDoc}
+                  style={{
+                    opacity: !activeDoc ? 0.6 : 1,
+                    cursor: !activeDoc ? 'not-allowed' : 'pointer',
+                    paddingLeft: 12,
+                    paddingRight: 12
+                  }}
+                  title="내보내기"
+                >
+                  내보내기
+                </button>
+
+                {isDownloadOpen && activeDoc && (
+                  <div
+                    className="card"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: 0,
+                      minWidth: 180,
+                      padding: 8,
+                      border: '2px solid #2a2a2c',
+                      background: '#0f0f12',
+                      zIndex: 50,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
+                    }}
+                  >
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => { setIsDownloadOpen(false); exportAsTxt() }}
+                      style={{
+                        width: '100%',
+                        justifyContent: 'flex-start',
+                        textAlign: 'left',
+                        marginBottom: 6
+                      }}
+                    >
+                      txt로 내보내기
+                    </button>
+
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => { setIsDownloadOpen(false); exportAsDocx() }}
+                      style={{
+                        width: '100%',
+                        justifyContent: 'flex-start',
+                        textAlign: 'left'
+                      }}
+                    >
+                      docx로 내보내기
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {!user && <div style={{ fontSize: 10, color: '#ffab40' }}>* 전체 분석은 로그인 필요</div>}
+
+          <div className="scroll-hide" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            {activeDoc ? (
+              activeAnalysis?.result?.split_sentences ? (
+                <div className="mono" style={{ paddingBottom: 40 }}>
+                  <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
+                </div>
+              ) : (
+                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 12 }}>
+                  {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
+                </pre>
+              )
+            ) : (
+              <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
             )}
           </div>
+
+          {/* Draft input */}
+          <div className="card" style={{ padding: 12, background: '#141417', border: '3px solid #2a2a2c' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ fontWeight: 700 }}>텍스트 입력</div>
+              <button
+                className="btn"
+                onClick={onSaveDraft}
+                disabled={isSavingDraft || isUploading || isAnalyzing}
+                style={{
+                  opacity: (isSavingDraft || isUploading || isAnalyzing) ? 0.7 : 1,
+                  cursor: (isSavingDraft || isUploading || isAnalyzing) ? 'not-allowed' : 'pointer',
+                }}
+                title={isSavingDraft ? '저장 중…' : '입력한 텍스트를 .txt로 저장'}
+              >
+                {isSavingDraft ? '저장 중…' : '저장'}
+              </button>
+            </div>
+
+            <textarea
+              value={draftText}
+              onChange={(e) => setDraftText(e.target.value)}
+              placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
+              className="mono"
+              style={{
+                width: '96%',
+                height: 140,
+                resize: 'vertical',
+                borderRadius: 8,
+                border: '1px solid #2a2a2c',
+                background: '#0f0f12',
+                color: '#e6e6ea',
+                padding: 10,
+                outline: 'none',
+                lineHeight: 1.5,
+                fontSize: 12
+              }}
+            />
+            <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
+              저장 시 파일명은 자동으로 <span className="mono">draft_YYYYMMDD_HHMMSS.txt</span> 형태로 생성됩니다.
+            </div>
+          </div>
+        </div>
+
+        {/* Right panel */}
+        <div className="card scroll-hide right-panel" style={{ padding: 8, overflow: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>분석 결과</div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                {activeAnalysis ? `mode: ${mode}` : '분석을 실행하거나 기록을 선택하세요.'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {readerLevel && <Badge>독자 수준: {readerLevel}</Badge>}
+
+              {canShowJson && rightView === 'report' && (
+                <button className="btn" onClick={() => setRightView('json')} disabled={!activeAnalysis}>
+                  JSON 파일로 보기
+                </button>
+              )}
+
+              {canShowJson && rightView === 'json' && (
+                <button className="btn" onClick={() => setRightView('report')}>
+                  돌아오기
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!activeAnalysis && (
+            <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
+              오른쪽 패널에는 에이전트들의 결과(JSON)가 표시됩니다. <br />
+              UPSTAGE_API_KEY가 없으면 로컬 휴리스틱 모드로 동작합니다.
+            </div>
+          )}
+
+          {activeAnalysis && (
+            <div style={{ marginTop: 12 }}>
+              {rightView === 'report' && (
+                <>
+                  {reportMarkdown ? (
+                    <div className="card" style={{ padding: 16, background: '#202022', marginBottom: 12 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 12, borderBottom: '1px solid #444', paddingBottom: 8, fontSize: 14 }}>
+                        📝 종합 분석 리포트 (Chief Editor)
+                      </div>
+                      <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                        <ReactMarkdown>{reportMarkdown}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+                      <div style={{ fontWeight: 700 }}>요약</div>
+                      <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                        {activeAnalysis.result?.aggregate?.summary || '—'}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {rightView === 'json' && (
+                <div className="card" style={{ padding: 12 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Raw JSON</div>
+                  <pre className="mono" style={{ whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.5 }}>
+                    {pretty(activeAnalysis.result)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {docHistoryOpenId && (
+        <div
+          onClick={() => setDocHistoryOpenId(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(10, 10, 12, 0.7)',
+            zIndex: 1400,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(520px, 94vw)',
+              padding: 16,
+              border: '2px solid #2a2a2c',
+              background: '#0f0f12',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>문서 기록</div>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  {historyDoc ? `${historyDoc.title} · ${historyDoc.filename}` : '선택된 문서'}
+                </div>
+              </div>
+              <button className="btn" onClick={() => setDocHistoryOpenId(null)}>닫기</button>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              {docHistoryLoadingId === docHistoryOpenId && (
+                <div className="muted" style={{ fontSize: 12 }}>불러오는 중...</div>
+              )}
+
+              {docHistoryLoadingId !== docHistoryOpenId && (
+                (() => {
+                  const items = docHistoryById[docHistoryOpenId] || []
+                  if (!items.length) {
+                    return <div className="muted" style={{ fontSize: 12 }}>분석 기록이 없습니다.</div>
+                  }
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {items.map(item => {
+                        const labelTitle = historyDoc?.title
+                          ? `${historyDoc.title} · ${item.id}`
+                          : item.id
+                        return (
+                          <div key={item.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <button
+                              className="btn"
+                              onClick={() => onSelectDocAnalysis(docHistoryOpenId, item.id)}
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'flex-start',
+                                gap: 12,
+                                textAlign: 'left',
+                                background: activeAnalysis?.id === item.id ? '#1b1b1f' : undefined
+                              }}
+                            >
+                              {/* historyLabel 미정의 버그 수정: item.id 표시 */}
+                              <span
+                                title={labelTitle}
+                                style={{
+                                  fontSize: 12,
+                                  flex: '0 0 50%',
+                                  maxWidth: '50%',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {item.id}
+                              </span>
+                              <span className="muted" style={{ fontSize: 12, marginLeft: 'auto', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                {formatDisplayTimestamp(item.created_at)}
+                              </span>
+                            </button>
+
+                            <button
+                              className="btn"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onDeleteAnalysis(item.id)
+                              }}
+                              disabled={loading || isAnalyzing || isSavingDraft || isUploading}
+                              style={{
+                                padding: '2px 6px',
+                                minWidth: 28,
+                                height: 28,
+                                display: 'grid',
+                                placeItems: 'center',
+                                background: '#1a0f10',
+                                border: '1px solid rgba(239, 83, 80, 0.55)',
+                                color: '#ef5350'
+                              }}
+                              title="분석 삭제"
+                              aria-label="분석 삭제"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path
+                                  d="M4 7h16M9 7v-2.2c0-.7.6-1.3 1.3-1.3h3.4c.7 0 1.3.6 1.3 1.3V7M9.5 11.5v6M14.5 11.5v6M6.5 7l1 13.2c.1 1 1 1.8 2 1.8h5c1 0 1.9-.8 2-1.8L17.5 7"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
