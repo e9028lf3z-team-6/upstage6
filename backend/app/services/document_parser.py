@@ -2,6 +2,7 @@ import zipfile
 import zlib
 import struct
 import xml.etree.ElementTree as ET
+import re  # HTML 태그 제거용
 from pathlib import Path
 from typing import Tuple, Dict, Any
 
@@ -45,20 +46,26 @@ class DocumentParser:
         # ------------------------------
         if settings.upstage_api_key:
             try:
+                print(f"[PROGRESS] Upstage Document Parse 시도 중... ({path.name})")
                 text, meta = await self._extract_with_upstage(path)
                 if text and text.strip():
+                    print(f"[PROGRESS] Upstage Document Parse 성공")
                     return text, {
                         "source": "upstage_document_parse",
                         "file_name": path.name,
                         "file_type": ext,
                         **meta,
                     }
+                else:
+                    print(f"[WARNING] Upstage Parse 결과가 비어있습니다. 로컬 파서로 전환합니다.")
             except Exception as e:
+                print(f"[ERROR] Upstage Parse 실패: {e}")
                 upstage_error = str(e)
 
         # ------------------------------
         # 2) Local fallback
         # ------------------------------
+        print(f"[PROGRESS] 로컬 파서 실행 중... ({ext})")
         if ext == ".pdf":
             text = self._extract_pdf(path)
             method = "local_pypdf"
@@ -98,7 +105,38 @@ class DocumentParser:
                 data = resp.json()
 
         text = ""
-        if isinstance(data, dict):
+        # 1. Elements 기반 추출 (가장 정확하며 띄어쓰기 보존에 유리)
+        if isinstance(data, dict) and isinstance(data.get("elements"), list):
+            text_parts = []
+            for elem in data["elements"]:
+                content = elem.get("content")
+                elem_text = ""
+
+                # content가 딕셔너리인 경우 (최신 API 응답)
+                if isinstance(content, dict):
+                    # text > markdown > html 순서로 시도
+                    if content.get("text"):
+                        elem_text = content["text"]
+                    elif content.get("markdown"):
+                        elem_text = content["markdown"]
+                    elif content.get("html"):
+                        # HTML 태그 제거
+                        html_content = content["html"]
+                        elem_text = re.sub(r'<[^>]+>', '', html_content)
+                # content가 문자열인 경우
+                elif isinstance(content, str):
+                    elem_text = content
+                # top-level text 키 확인
+                elif elem.get("text"):
+                    elem_text = elem["text"]
+
+                if elem_text and elem_text.strip():
+                    text_parts.append(elem_text.strip())
+            
+            text = "\n\n".join(text_parts)
+
+        # 2. Fallback 방식들
+        if not text and isinstance(data, dict):
             if isinstance(data.get("text"), str):
                 text = data["text"]
             elif isinstance(data.get("content"), dict) and isinstance(data["content"].get("text"), str):
@@ -117,7 +155,15 @@ class DocumentParser:
     # --------------------------------------------------
     def _extract_pdf(self, path: Path) -> str:
         reader = PdfReader(str(path))
-        return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+        # 최신 pypdf의 layout 모드를 사용하여 띄어쓰기 보존 시도
+        try:
+            pages_text = []
+            for page in reader.pages:
+                t = page.extract_text(extraction_mode="layout") or ""
+                pages_text.append(t)
+            return "\n".join(pages_text).strip()
+        except Exception:
+            return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
 
     def _extract_docx(self, path: Path) -> str:
         doc = DocxDocument(str(path))
