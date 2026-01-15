@@ -115,7 +115,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
       segments.push({ start, end, text: segmentText, issues })
     }
 
-    const handleMouseEnter = (e, issues) => {
+    const handleMouseEnter = (e, issues, borderColor) => {
       const content = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {issues.map((issue, i) => {
@@ -125,7 +125,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
               <div key={i}>
                 <strong style={{
                   textTransform: 'capitalize',
-                  color: ISSUE_COLORS[agent] ? '#fff' : '#cfcfd6',
+                  color: ISSUE_COLORS[agent] ? '#fff' : '#000',
                   background: ISSUE_COLORS[agent] || 'transparent',
                   padding: '1px 4px',
                   borderRadius: 3,
@@ -137,7 +137,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
           })}
         </div>
       )
-      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor })
     }
 
     return (
@@ -159,7 +159,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
             <mark
               key={`${segment.start}-${segment.end}`}
               style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
-              onMouseEnter={(e) => handleMouseEnter(e, sortedIssues)}
+              onMouseEnter={(e) => handleMouseEnter(e, sortedIssues, color)}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
@@ -194,7 +194,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   collect(analysisResult.spelling, 'spelling')
   collect(analysisResult.tension_curve, 'tension')
 
-  const handleMouseEnterSimple = (e, issue) => {
+  const handleMouseEnterSimple = (e, issue, borderColor) => {
     const content = (
       <div>
         <strong style={{
@@ -208,7 +208,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
         <span>{issue.reason || issue.suggestion || 'Issue found'}</span>
       </div>
     )
-    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor })
   }
 
   const issuesBySentence = {}
@@ -247,7 +247,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
             <mark
               key={`iss-${i}`}
               style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
-              onMouseEnter={(e) => handleMouseEnterSimple(e, issue)}
+              onMouseEnter={(e) => handleMouseEnterSimple(e, issue, color)}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
@@ -332,31 +332,56 @@ function scoreColor(score) {
   return '#f44336'
 }
 
-function Tooltip({ content, position, visible }) {
+function Tooltip({ content, position, visible, borderColor }) {
+  console.log('Tooltip borderColor:', borderColor);
   if (!visible || !content) return null
+
   return (
+
     <div style={{
+
       position: 'fixed',
+
       top: position.y + 12,
+
       left: position.x + 12,
+
       maxWidth: 320,
+
       padding: '8px 12px',
-      background: '#1f1f23',
-      border: '1px solid #3a3a3f',
+
+      background: '#d0d0d0',
+
+      border: `5px solid ${borderColor || '#555'}`,
+
       borderRadius: 8,
-      color: '#e6e6ea',
+
+      color: '#000',
+
       fontSize: 12,
+
       lineHeight: 1.5,
+
       whiteSpace: 'pre-wrap',
+
       zIndex: 1500,
+
       pointerEvents: 'none',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
-      transition: 'opacity 0.1s ease',
+
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+
+      transition: 'opacity 0.1s ease, border-color 0.1s ease',
+
       opacity: visible ? 1 : 0,
+
     }}>
+
       {content}
+
     </div>
+
   )
+
 }
 
 const TOAST_STYLES = {
@@ -402,7 +427,7 @@ export default function App() {
   })
 
   const [toasts, setToasts] = useState([])
-  const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0 })
+  const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0, borderColor: null })
 
   const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -1603,8 +1628,8 @@ function SettingsIcon({ size = 28 }) {
                       display: 'grid',
                       placeItems: 'center',
                       opacity: user ? 1 : 0.45,
-                      cursor: user ? 'pointer' : 'not-allowed',
-                      background: 'darkred'
+                      background: '#1a0f10',
+                      color: '#ef5350'
                     }}
                   >
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
