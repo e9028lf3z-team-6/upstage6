@@ -19,6 +19,14 @@ function pretty(obj) {
   try { return JSON.stringify(obj, null, 2) } catch { return String(obj) }
 }
 
+function convertRgbaToRgb(rgbaString) {
+  const parts = rgbaString.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+  if (parts && parts.length === 5) {
+    return `rgb(${parts[1]}, ${parts[2]}, ${parts[3]})`;
+  }
+  return rgbaString; // Return original if not rgba
+}
+
 function Badge({ children }) {
   return (
     <span style={{
@@ -36,7 +44,7 @@ function Badge({ children }) {
 
 const ISSUE_COLORS = {
   tone: 'rgba(92, 107, 192, 0.5)',    // Indigo
-  logic: 'rgba(255, 235, 59, 0.5)',   // Yellow
+  logic: 'rgba(255, 214, 0, 0.5)',   // Highlighter Yellow
   causality: 'rgba(255, 167, 38, 0.5)', // Orange
   trauma: 'rgba(239, 83, 80, 0.5)',     // Red
   hate_bias: 'rgba(171, 71, 188, 0.5)',// Purple
@@ -137,7 +145,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
           })}
         </div>
       )
-      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor })
+      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor: convertRgbaToRgb(borderColor) })
     }
 
     return (
@@ -208,7 +216,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
         <span>{issue.reason || issue.suggestion || 'Issue found'}</span>
       </div>
     )
-    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor })
+    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor: convertRgbaToRgb(borderColor) })
   }
 
   const issuesBySentence = {}
@@ -333,7 +341,6 @@ function scoreColor(score) {
 }
 
 function Tooltip({ content, position, visible, borderColor }) {
-  console.log('Tooltip borderColor:', borderColor);
   if (!visible || !content) return null
 
   return (
@@ -931,7 +938,7 @@ function SettingsIcon({ size = 28 }) {
 
   return (
     <>
-      <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} />
+      <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} borderColor={tooltip.borderColor} />
       <style>{`
         body {
           scrollbar-width: none;
