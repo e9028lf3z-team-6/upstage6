@@ -47,10 +47,18 @@ const ISSUE_COLORS = {
   default: 'rgba(158, 158, 158, 0.35)'
 }
 
-function HighlightedText({ text, analysisResult }) {
+function HighlightedText({ text, analysisResult, setTooltip }) {
   const rawHighlights = Array.isArray(analysisResult?.highlights) ? analysisResult.highlights : []
   const rawNormalized = Array.isArray(analysisResult?.normalized_issues) ? analysisResult.normalized_issues : []
   const hasDocHighlights = rawHighlights.length > 0 || rawNormalized.length > 0
+
+  const handleMouseLeave = () => {
+    setTooltip(prev => ({ ...prev, visible: false }))
+  }
+
+  const handleMouseMove = (e) => {
+    setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))
+  }
 
   if (hasDocHighlights && typeof text === 'string') {
     const textLen = text.length
@@ -107,6 +115,31 @@ function HighlightedText({ text, analysisResult }) {
       segments.push({ start, end, text: segmentText, issues })
     }
 
+    const handleMouseEnter = (e, issues) => {
+      const content = (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {issues.map((issue, i) => {
+            const agent = issue.agent || 'unknown'
+            const reasonText = issue.reason || ''
+            return (
+              <div key={i}>
+                <strong style={{
+                  textTransform: 'capitalize',
+                  color: ISSUE_COLORS[agent] ? '#fff' : '#cfcfd6',
+                  background: ISSUE_COLORS[agent] || 'transparent',
+                  padding: '1px 4px',
+                  borderRadius: 3,
+                  marginRight: 4
+                }}>{agent}</strong>
+                <span style={{ opacity: 0.8 }}>{reasonText}</span>
+              </div>
+            )
+          })}
+        </div>
+      )
+      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+    }
+
     return (
       <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
         {segments.map(segment => {
@@ -121,19 +154,14 @@ function HighlightedText({ text, analysisResult }) {
           })
           const primary = sortedIssues[0]
           const color = ISSUE_COLORS[primary.agent] || ISSUE_COLORS.default
-          const title = sortedIssues.map(issue => {
-            const agent = issue.agent || 'unknown'
-            const severity = issue.severity ? ` (${issue.severity})` : ''
-            const label = issue.label || 'issue'
-            const reason = issue.reason ? ` - ${issue.reason}` : ''
-            return `${agent}${severity}: ${label}${reason}`
-          }).join('\n')
 
           return (
             <mark
               key={`${segment.start}-${segment.end}`}
-              style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2 }}
-              title={title}
+              style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
+              onMouseEnter={(e) => handleMouseEnter(e, sortedIssues)}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
             >
               {segment.text}
             </mark>
@@ -147,11 +175,9 @@ function HighlightedText({ text, analysisResult }) {
     return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
   }
 
+  // ... (fallback logic, can be updated later if needed)
   const sentences = analysisResult.split_sentences
-  // Aggregate all issues from different agents
   let allIssues = []
-
-  // Helper to collect issues
   const collect = (source, type) => {
     if (source?.issues && Array.isArray(source.issues)) {
       source.issues.forEach(issue => {
@@ -159,9 +185,7 @@ function HighlightedText({ text, analysisResult }) {
       })
     }
   }
-
   collect(analysisResult.tone, 'tone')
-  // ✅ logic / causality 분리 (기존엔 둘 중 하나를 logic으로만 묶어서 causality 색상/표시가 깨짐)
   collect(analysisResult.logic, 'logic')
   collect(analysisResult.causality, 'causality')
   collect(analysisResult.trauma, 'trauma')
@@ -169,6 +193,23 @@ function HighlightedText({ text, analysisResult }) {
   collect(analysisResult.genre_cliche, 'genre_cliche')
   collect(analysisResult.spelling, 'spelling')
   collect(analysisResult.tension_curve, 'tension')
+
+  const handleMouseEnterSimple = (e, issue) => {
+    const content = (
+      <div>
+        <strong style={{
+          textTransform: 'capitalize',
+          color: '#fff',
+          background: ISSUE_COLORS[issue.type] || ISSUE_COLORS.default,
+          padding: '1px 4px',
+          borderRadius: 3,
+          marginRight: 4
+        }}>{issue.type}</strong>
+        <span>{issue.reason || issue.suggestion || 'Issue found'}</span>
+      </div>
+    )
+    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+  }
 
   const issuesBySentence = {}
   allIssues.forEach(issue => {
@@ -202,13 +243,13 @@ function HighlightedText({ text, analysisResult }) {
           }
 
           const color = ISSUE_COLORS[issue.type] || ISSUE_COLORS.default
-          const title = `${issue.type.toUpperCase()}: ${issue.reason || issue.suggestion || 'Issue found'}`
-
           fragments.push(
             <mark
               key={`iss-${i}`}
-              style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2 }}
-              title={title}
+              style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
+              onMouseEnter={(e) => handleMouseEnterSimple(e, issue)}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
             >
               {sent.slice(start, end)}
             </mark>
@@ -291,6 +332,33 @@ function scoreColor(score) {
   return '#f44336'
 }
 
+function Tooltip({ content, position, visible }) {
+  if (!visible || !content) return null
+  return (
+    <div style={{
+      position: 'fixed',
+      top: position.y + 12,
+      left: position.x + 12,
+      maxWidth: 320,
+      padding: '8px 12px',
+      background: '#1f1f23',
+      border: '1px solid #3a3a3f',
+      borderRadius: 8,
+      color: '#e6e6ea',
+      fontSize: 12,
+      lineHeight: 1.5,
+      whiteSpace: 'pre-wrap',
+      zIndex: 1500,
+      pointerEvents: 'none',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+      transition: 'opacity 0.1s ease',
+      opacity: visible ? 1 : 0,
+    }}>
+      {content}
+    </div>
+  )
+}
+
 const TOAST_STYLES = {
   success: { borderColor: '#2e7d32', background: 'rgba(46, 125, 50, 0.45)' },
   warning: { borderColor: '#ed6c02', background: 'rgba(237, 108, 2, 0.45)' },
@@ -329,6 +397,7 @@ export default function App() {
   })
 
   const [toasts, setToasts] = useState([])
+  const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0 })
 
   const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -827,6 +896,7 @@ export default function App() {
 
   return (
     <>
+      <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} />
       <style>{`
         body {
           scrollbar-width: none;
@@ -903,6 +973,34 @@ export default function App() {
           color: #cfcfd6;
           flex: 0 0 auto;
         }
+
+        .main-layout {
+          grid-template-areas: "left center right";
+        }
+        .left-panel { grid-area: left; }
+        .center-panel { grid-area: center; }
+        .right-panel { grid-area: right; }
+
+        @media (max-width: 1200px) {
+          .main-layout {
+            grid-template-columns: 300px 1fr;
+            grid-template-areas: "left center";
+          }
+          .right-panel {
+            display: none;
+          }
+        }
+        @media (max-width: 768px) {
+          .main-layout {
+            grid-template-columns: 1fr;
+            grid-template-areas: "center";
+            height: auto;
+            min-height: 100vh;
+          }
+          .left-panel {
+            display: none;
+          }
+        }
         @media (max-width: 640px) {
           .account-bar {
             padding: 6px 8px;
@@ -913,7 +1011,7 @@ export default function App() {
           }
         }
       `}</style>
-      <div className="scroll-hide" style={{
+      <div className="scroll-hide main-layout" style={{
         display: 'grid',
         gridTemplateColumns: '300px 1fr 480px',
         height: '100vh',
@@ -958,7 +1056,7 @@ export default function App() {
         )}
 
         {/* Left panel */}
-        <div className="card" style={{ padding: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div className="card left-panel" style={{ padding: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
           {/* Header + Upload button */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -1534,7 +1632,7 @@ export default function App() {
         </div>
 
         {/* Center panel */}
-        <div className="card scroll-hide" style={{ padding: 8, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="card scroll-hide center-panel" style={{ padding: 8, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -1556,7 +1654,7 @@ export default function App() {
                   border: '1px solid #2a2a2c',
                   background: '#16161a'
                 }}>
-                  페르소나 구성
+                  에이전트
                 </span>
 
                 {isLegendOpen && (
@@ -1695,7 +1793,7 @@ export default function App() {
             {activeDoc ? (
               activeAnalysis?.result?.split_sentences ? (
                 <div className="mono" style={{ paddingBottom: 40 }}>
-                  <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} />
+                  <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
                 </div>
               ) : (
                 <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 12 }}>
@@ -1751,7 +1849,7 @@ export default function App() {
         </div>
 
         {/* Right panel */}
-        <div className="card scroll-hide" style={{ padding: 8, overflow: 'auto' }}>
+        <div className="card scroll-hide right-panel" style={{ padding: 8, overflow: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>분석 결과</div>
@@ -1953,3 +2051,4 @@ export default function App() {
     </>
   )
 }
+
