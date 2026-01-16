@@ -398,6 +398,8 @@ const TOAST_STYLES = {
   error: { borderColor: '#d32f2f', background: 'rgba(211, 47, 47, 0.45)' }
 }
 
+
+
 const PERSONA_LEGEND = [
   { key: 'tone', label: '어조 에이전트' },
   { key: 'logic', label: '논리 에이전트' },
@@ -1260,93 +1262,9 @@ function SettingsIcon({ size = 28 }) {
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: 16 }}>페르소나 갯수</div>
-                          <div className="muted" style={{ fontSize: 12 }}>1(디폴트 3) 최대 5</div>
-                        </div>
-                        <span className="mono" style={{
-                          padding: '4px 10px',
-                          borderRadius: 10,
-                          border: '1px solid #2a2a2c',
-                          background: '#141417',
-                          fontSize: 13,
-                          fontWeight: 900,
-                          color: '#e6e6ea',
-                          minWidth: 44,
-                          textAlign: 'center'
-                        }}>
-                          {personaCount}명
-                        </span>
-                      </div>
 
-                      <div>
-                        <input
-                          type="range"
-                          min={1}
-                          max={5}
-                          step={1}
-                          value={personaCount}
-                          onChange={(e) => setPersonaCount(Number(e.target.value))}
-                          style={{ width: '100%', boxSizing: 'border-box', padding: 0 }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                          <span className="muted" style={{ fontSize: 11 }}>1</span>
-                          <span className="muted" style={{ fontSize: 11 }}>5</span>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: 16 }}>집중 모드</div>
-                        <div className="muted" style={{ fontSize: 12 }}>창의성 ↔ 직관성</div>
-                      </div>
 
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => setCreativeFocus(prev => !prev)}
-                        aria-pressed={creativeFocus}
-                        style={{
-                          minWidth: 150,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                          padding: '6px 10px'
-                        }}
-                      >
-                        <span style={{ fontSize: 12, fontWeight: 800 }}>
-                          {creativeFocus ? '창의성 중심' : '직관성'}
-                        </span>
-
-                        <span aria-hidden="true" style={{
-                          width: SWITCH_W,
-                          height: SWITCH_H,
-                          borderRadius: 999,
-                          background: creativeFocus ? '#66bb6a' : '#555',
-                          position: 'relative',
-                          display: 'inline-block',
-                          padding: SWITCH_PAD,
-                          boxSizing: 'border-box',
-                          transition: 'background 0.18s ease',
-                          border: '1px solid #2a2a2c'
-                        }}>
-                          <span style={{
-                            width: KNOB,
-                            height: KNOB,
-                            borderRadius: '50%',
-                            background: '#0f0f12',
-                            display: 'block',
-                            transform: creativeFocus ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
-                            transition: 'transform 0.18s ease',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
-                          }} />
-                        </span>
-                      </button>
-                    </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                       <div>
@@ -1680,67 +1598,67 @@ function SettingsIcon({ size = 28 }) {
                   {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
                 </div>
               </div>
-              <div
-                onMouseEnter={onLegendEnter}
-                onMouseLeave={onLegendLeave}
-                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-              >
-                <span style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#cfcfd6',
-                  padding: '3px 8px',
-                  borderRadius: 8,
-                  border: '1px solid #2a2a2c',
-                  background: '#16161a'
-                }}>
-                  에이전트
-                </span>
-
-                {isLegendOpen && (
-                  <div
-                    className="card"
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 6px)',
-                      left: 0,
-                      minWidth: 180,
-                      padding: 10,
-                      border: '2px solid #2a2a2c',
-                      background: '#0f0f12',
-                      zIndex: 60,
-                      boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
-                    }}
-                  >
-                    <div style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: '#888',
-                      marginBottom: 8,
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5
-                    }}>
-                      Agents by Color
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {PERSONA_LEGEND.map(item => (
-                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ 
-                            width: 10,
-                            height: 10,
-                            borderRadius: 3,
-                            background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
-                            border: '1px solid #444'
-                          }} />
-                          <span className="mono" style={{ fontSize: 12, color: '#cfcfd6' }}>
-                            {item.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                            <div
+                              onMouseEnter={onLegendEnter}
+                              onMouseLeave={onLegendLeave}
+                              style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                              <span style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: '#cfcfd6',
+                                padding: '3px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #2a2a2c',
+                                background: '#16161a'
+                              }}>
+                                에이전트
+                              </span>
+              
+                              {isLegendOpen && (
+                                <div
+                                  className="card"
+                                  style={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 6px)',
+                                    left: 0,
+                                    minWidth: 180,
+                                    padding: 10,
+                                    border: '2px solid #2a2a2c',
+                                    background: '#0f0f12',
+                                    zIndex: 60,
+                                    boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
+                                  }}
+                                >
+                                  <div style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#888',
+                                    marginBottom: 8,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 0.5
+                                  }}>
+                                    Agents by Color
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    {PERSONA_LEGEND.map(item => (
+                                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ 
+                                          width: 10,
+                                          height: 10,
+                                          borderRadius: 3,
+                                          background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
+                                          border: '1px solid #444'
+                                        }} />
+                                        <span className="mono" style={{ fontSize: 12, color: '#cfcfd6' }}>
+                                          {item.label}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
             </div>
 
             {/* 실행 버튼 + 내보내기 hover 메뉴 */}
