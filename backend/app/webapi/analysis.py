@@ -36,15 +36,20 @@ def _is_fallback(result: dict) -> bool:
 @router.post("/run/{doc_id}", response_model=AnalysisOut)
 async def run_analysis(
     doc_id: str,
-    current_user: User = Depends(get_current_user)
+    user: User | None = Depends(get_current_user)
 ):
     # Determine analysis mode based on login status
-    mode = "full" if current_user else "causality_only"
+    mode = "full" if user else "causality_only"
 
     async with get_session() as session:
         d = await session.get(Document, doc_id)
         if not d:
             raise HTTPException(404, "Document not found")
+            
+        # Permission check
+        if d.user_id is not None:
+            if not user or d.user_id != user.id:
+                raise HTTPException(403, "Not authorized to analyze this document")
 
         result = await run_analysis_for_text(
             d.extracted_text,
@@ -77,11 +82,21 @@ async def run_analysis(
         )
 
 @router.get("/{analysis_id}", response_model=AnalysisDetail)
-async def get_analysis(analysis_id: str):
+async def get_analysis(analysis_id: str, user: User | None = Depends(get_current_user)):
     async with get_session() as session:
-        a = await session.get(Analysis, analysis_id)
-        if not a:
+        # Join with Document to check ownership
+        stmt = select(Analysis, Document).join(Document, Analysis.document_id == Document.id).where(Analysis.id == analysis_id)
+        res = await session.execute(stmt)
+        row = res.first()
+        
+        if not row:
             raise HTTPException(404, "Analysis not found")
+        
+        a, d = row
+        if d.user_id is not None:
+            if not user or d.user_id != user.id:
+                raise HTTPException(403, "Not authorized to access this analysis")
+
         return AnalysisDetail(
             id=a.id,
             document_id=a.document_id,
@@ -94,8 +109,17 @@ async def get_analysis(analysis_id: str):
         )
 
 @router.get("/by-document/{doc_id}", response_model=list[AnalysisOut])
-async def list_analyses_for_doc(doc_id: str):
+async def list_analyses_for_doc(doc_id: str, user: User | None = Depends(get_current_user)):
     async with get_session() as session:
+        # Check document ownership first
+        d = await session.get(Document, doc_id)
+        if not d:
+            raise HTTPException(404, "Document not found")
+            
+        if d.user_id is not None:
+            if not user or d.user_id != user.id:
+                raise HTTPException(403, "Not authorized to access analyses for this document")
+
         res = await session.execute(select(Analysis).where(Analysis.document_id==doc_id).order_by(Analysis.created_at.desc()))
         items = res.scalars().all()
         out = []
@@ -114,11 +138,20 @@ async def list_analyses_for_doc(doc_id: str):
 
 
 @router.delete("/{analysis_id}")
-async def delete_analysis(analysis_id: str):
+async def delete_analysis(analysis_id: str, user: User | None = Depends(get_current_user)):
     async with get_session() as session:
-        a = await session.get(Analysis, analysis_id)
-        if not a:
+        stmt = select(Analysis, Document).join(Document, Analysis.document_id == Document.id).where(Analysis.id == analysis_id)
+        res = await session.execute(stmt)
+        row = res.first()
+        
+        if not row:
             raise HTTPException(404, "Analysis not found")
+            
+        a, d = row
+        if d.user_id is not None:
+            if not user or d.user_id != user.id:
+                raise HTTPException(403, "Not authorized to delete this analysis")
+            
         await session.delete(a)
         await session.commit()
     return {"ok": True}

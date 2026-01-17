@@ -8,6 +8,7 @@ import {
   listAnalysesByDoc,
   listDocuments,
   runAnalysis,
+  updateDocument,
   uploadDocument
 } from './api.js'
 
@@ -45,13 +46,13 @@ function Badge({ children }) {
 const ISSUE_COLORS = {
   tone: 'rgba(92, 107, 192, 0.5)',    // Indigo
   logic: 'rgba(255, 214, 0, 0.5)',   // Highlighter Yellow
-  causality: 'rgba(255, 167, 38, 0.5)', // Orange
+  // causality: logic에 통합됨 (removed)
   trauma: 'rgba(239, 83, 80, 0.5)',     // Red
   hate_bias: 'rgba(171, 71, 188, 0.5)',// Purple
   genre_cliche: 'rgba(66, 165, 245, 0.5)',// Blue
-  cliche: 'rgba(38, 198, 218, 0.5)',   // Turquoise
+  // cliche: genre_cliche에 통합됨 (removed)
   spelling: 'rgba(236, 64, 122, 0.5)', // Pink
-  tension: 'rgba(139, 195, 74, 0.5)',  // Light Green
+  tension_curve: 'rgba(139, 195, 74, 0.5)',  // Light Green (Key updated from tension to tension_curve)
   default: 'rgba(189, 189, 189, 0.4)'  // Grey
 }
 
@@ -195,12 +196,12 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   }
   collect(analysisResult.tone, 'tone')
   collect(analysisResult.logic, 'logic')
-  collect(analysisResult.causality, 'causality')
+  // collect(analysisResult.causality, 'causality') // Removed
   collect(analysisResult.trauma, 'trauma')
   collect(analysisResult.hate_bias, 'hate_bias')
   collect(analysisResult.genre_cliche, 'genre_cliche')
   collect(analysisResult.spelling, 'spelling')
-  collect(analysisResult.tension_curve, 'tension')
+  collect(analysisResult.tension_curve, 'tension_curve') // Updated key
 
   const handleMouseEnterSimple = (e, issue, borderColor) => {
     const content = (
@@ -344,51 +345,28 @@ function Tooltip({ content, position, visible, borderColor }) {
   if (!visible || !content) return null
 
   return (
-
     <div style={{
-
       position: 'fixed',
-
       top: position.y + 12,
-
       left: position.x + 12,
-
       maxWidth: 320,
-
       padding: '8px 12px',
-
       background: '#d0d0d0',
-
       border: `5px solid ${borderColor || '#555'}`,
-
       borderRadius: 8,
-
       color: '#000',
-
       fontSize: 12,
-
       lineHeight: 1.5,
-
       whiteSpace: 'pre-wrap',
-
       zIndex: 1500,
-
       pointerEvents: 'none',
-
       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-
       transition: 'opacity 0.1s ease, border-color 0.1s ease',
-
       opacity: visible ? 1 : 0,
-
     }}>
-
       {content}
-
     </div>
-
   )
-
 }
 
 const TOAST_STYLES = {
@@ -398,19 +376,187 @@ const TOAST_STYLES = {
   error: { borderColor: '#d32f2f', background: 'rgba(211, 47, 47, 0.45)' }
 }
 
-
-
 const PERSONA_LEGEND = [
   { key: 'tone', label: '어조 에이전트' },
-  { key: 'logic', label: '논리 에이전트' },
-  { key: 'causality', label: '개연성 에이전트' },
+  { key: 'logic', label: '개연성(논리) 에이전트' },
   { key: 'trauma', label: '트라우마 에이전트' },
   { key: 'hate_bias', label: '혐오·편향 에이전트' },
   { key: 'genre_cliche', label: '장르 클리셰 에이전트' },
-  { key: 'cliche', label: '클리셰 에이전트' },
   { key: 'spelling', label: '맞춤법 에이전트' },
-  { key: 'tension', label: '긴장도 에이전트' },
+  { key: 'tension_curve', label: '긴장도 에이전트' }, // Updated key
 ]
+
+function SettingsModal({ doc, onClose, onSave }) {
+  const [settings, setSettings] = useState({
+    target_audience: '',
+    genre: '소설',
+    selected_agents: PERSONA_LEGEND.map(p => p.key)
+  })
+
+  // ✅ doc이 변경되거나 모달이 열릴 때 데이터를 최신화
+  useEffect(() => {
+    if (!doc?.meta_json) {
+        console.log("SettingsModal: No meta_json found in doc", doc);
+        return;
+    }
+    try {
+      const meta = typeof doc.meta_json === 'string' ? JSON.parse(doc.meta_json) : doc.meta_json;
+      console.log("SettingsModal: Parsed meta_json", meta);
+      const saved = meta.settings || {};
+      setSettings({
+        target_audience: saved.target_audience || '',
+        genre: saved.genre || '소설',
+        selected_agents: saved.selected_agents || PERSONA_LEGEND.map(p => p.key)
+      });
+    } catch (e) {
+      console.error("Failed to parse meta_json", e);
+    }
+  }, [doc])
+
+  const handleChange = (key, val) => {
+    setSettings(prev => ({ ...prev, [key]: val }))
+  }
+
+  const toggleAgent = (key) => {
+    setSettings(prev => {
+      const current = prev.selected_agents || []
+      if (current.includes(key)) {
+        return { ...prev, selected_agents: current.filter(k => k !== key) }
+      } else {
+        return { ...prev, selected_agents: [...current, key] }
+      }
+    })
+  }
+
+  return (
+    <div 
+      onClick={onClose} // ✅ 오버레이 클릭 시 닫기
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+        zIndex: 1400, display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}
+    >
+      <div 
+        className="card" 
+        onClick={(e) => e.stopPropagation()} // ✅ 내부 클릭 시 닫힘 방지
+        style={{ width: 420, padding: 20, background: '#141417', border: '1px solid #2a2a2c', maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: 20 }}>문서 분석 설정</h3>
+        
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 13, marginBottom: 6, color: '#9aa0a6' }}>타겟 독자층</label>
+          <input 
+            type="text" 
+            className="mono"
+            style={{ width: '100%', padding: 8, background: '#0f0f12', border: '1px solid #2a2a2c', color: '#e6e6ea', borderRadius: 4 }}
+            placeholder="예: 20대 직장인, 판타지 소설 매니아"
+            value={settings.target_audience}
+            onChange={e => handleChange('target_audience', e.target.value)}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 13, marginBottom: 6, color: '#9aa0a6' }}>장르</label>
+          <select 
+            style={{ width: '100%', padding: 8, background: '#0f0f12', border: '1px solid #2a2a2c', color: '#e6e6ea', borderRadius: 4 }}
+            value={settings.genre}
+            onChange={e => handleChange('genre', e.target.value)}
+          >
+            <option value="소설">소설 (일반)</option>
+            <option value="에세이">에세이/수필</option>
+            <option value="기획서">기획서/비즈니스</option>
+            <option value="논문">학술 논문</option>
+            <option value="기사">뉴스 기사</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', fontSize: 13, marginBottom: 8, color: '#9aa0a6' }}>사용할 분석 도구 (에이전트)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {PERSONA_LEGEND.map(p => (
+              <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input 
+                  type="checkbox"
+                  checked={settings.selected_agents?.includes(p.key)}
+                  onChange={() => toggleAgent(p.key)}
+                  style={{ accentColor: '#2e7d32' }}
+                />
+                <span style={{ color: settings.selected_agents?.includes(p.key) ? '#e6e6ea' : '#777' }}>
+                  {p.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="btn" onClick={onClose} style={{ padding: '8px 16px' }}>취소</button>
+          <button className="btn" onClick={() => onSave(settings)} style={{ padding: '8px 16px', background: '#2e7d32', color: '#fff', borderColor: '#1b5e20' }}>저장</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditableTitle({ value, onSave, style, className }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [text, setText] = useState(value)
+
+  useEffect(() => { setText(value) }, [value])
+
+  const handleBlur = () => {
+    setIsEditing(false)
+    if (text !== value) onSave(text)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur()
+    } else if (e.key === 'Escape') {
+      setText(value)
+      setIsEditing(false)
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        className={className}
+        style={{ 
+          ...style, 
+          minWidth: 50, 
+          background: 'transparent', 
+          color: 'inherit', 
+          border: 'none', 
+          borderBottom: '1px solid #2e7d32', 
+          padding: 0,
+          outline: 'none'
+        }}
+        autoFocus
+        onClick={e => e.stopPropagation()}
+      />
+    )
+  }
+
+  return (
+    <div
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        setIsEditing(true)
+      }}
+      className={className}
+      style={{ ...style, cursor: 'text', userSelect: 'none' }}
+      title="더블 클릭하여 제목 수정"
+    >
+      {value || '제목 없음'}
+    </div>
+  )
+}
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -427,6 +573,7 @@ export default function App() {
   const [error, setError] = useState(null)
 
   // settings
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
   const [topic, setTopic] = useState('소설')
@@ -450,7 +597,11 @@ export default function App() {
   const [analysisElapsedSec, setAnalysisElapsedSec] = useState(0)
   const analysisTimerRef = useRef(null)
 
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+
   const [draftText, setDraftText] = useState('')
+  const [draftTitle, setDraftTitle] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
   const [isDraftInputOpen, setIsDraftInputOpen] = useState(false)
@@ -571,7 +722,13 @@ export default function App() {
 
     try {
       const doc = await uploadDocument(file)
-      await refreshDocs(false)
+      
+      if (user) {
+        await refreshDocs(false)
+      } else {
+        setDocs(prev => [doc, ...prev])
+      }
+      
       setActiveDocId(doc.id)
 
       setLeftMode('list')
@@ -600,6 +757,51 @@ export default function App() {
     await uploadOneFile(f)
   }
 
+  function onStartEdit() {
+    if (!activeDoc) return
+    setEditText(activeDoc.extracted_text || '')
+    setIsEditing(true)
+  }
+
+  function onCancelEdit() {
+    setIsEditing(false)
+    setEditText('')
+  }
+
+  async function onSaveEdit() {
+    if (!activeDocId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const updated = await updateDocument(activeDocId, { extracted_text: editText })
+      setActiveDoc(updated)
+      setIsEditing(false)
+      pushToast('원고가 수정되었습니다.', 'success')
+      // NOTE: Analysis results are not automatically updated. User must re-run analysis.
+    } catch (e2) {
+      setError(String(e2))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function onUpdateTitle(docId, newTitle) {
+    if (!newTitle.trim()) return
+    try {
+      const updated = await updateDocument(docId, { title: newTitle.trim() })
+      
+      // Update local state
+      setDocs(prev => prev.map(d => d.id === docId ? { ...d, title: updated.title } : d))
+      if (activeDoc?.id === docId) {
+        setActiveDoc(prev => ({ ...prev, title: updated.title }))
+      }
+      
+      pushToast('제목이 변경되었습니다.', 'success')
+    } catch (e) {
+      pushToast('제목 변경 실패: ' + e.message, 'error')
+    }
+  }
+
   async function onSaveDraft() {
     const text = (draftText ?? '').trim()
     if (!text) {
@@ -611,16 +813,34 @@ export default function App() {
     setError(null)
 
     try {
+      const title = (draftTitle || '').trim() || 'Untitled Draft'
       const filename = makeTimestampName('draft')
+      // NOTE: backend upload creates doc with filename. Title update needs separate call or upload modification.
+      // But uploadDocument doesn't take title param currently.
+      // Strategy: Upload then update title immediately.
+      
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
       const file = new File([blob], `${filename}.txt`, { type: 'text/plain' })
 
       const doc = await uploadDocument(file)
-      await refreshDocs(false)
-      setActiveDocId(doc.id)
+      
+      // Update title if provided
+      let finalDoc = doc
+      if (title) {
+        finalDoc = await updateDocument(doc.id, { title })
+      }
+
+      if (user) {
+        await refreshDocs(false)
+      } else {
+        setDocs(prev => [finalDoc, ...prev])
+      }
+      
+      setActiveDocId(finalDoc.id)
 
       setDraftText('')
-      pushToast('텍스트가 .txt 원고로 저장되었습니다.', 'success')
+      setDraftTitle('')
+      pushToast('텍스트가 원고로 저장되었습니다.', 'success')
     } catch (e2) {
       setError(String(e2))
     } finally {
@@ -649,6 +869,28 @@ export default function App() {
     }
   }
 
+  async function onSaveSettings(newSettings) {
+    if (!activeDocId) return
+    setLoading(true)
+    try {
+      console.log("Saving settings...", newSettings);
+      const updated = await updateDocument(activeDocId, { settings: newSettings })
+      console.log("Settings saved. Updated doc:", updated);
+      
+      // ✅ 확실한 동기화를 위해 서버에서 최신 데이터를 다시 가져옴
+      const latestDoc = await getDocument(activeDocId)
+      setActiveDoc(latestDoc)
+      setDocs(prev => prev.map(d => d.id === activeDocId ? { ...d, ...latestDoc } : d))
+      
+      setIsSettingsOpen(false)
+      pushToast('설정이 저장되었습니다.', 'success')
+    } catch (e) {
+      pushToast('설정 저장 실패: ' + e.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function onDeleteDoc(id) {
     if (!id) return
     const target = docs.find(x => x.id === id)
@@ -658,8 +900,18 @@ export default function App() {
     setLoading(true); setError(null)
     try {
       await deleteDocument(id)
-      const items = await listDocuments()
-      setDocs(items)
+      
+      let items = []
+      if (user) {
+        items = await listDocuments()
+        setDocs(items)
+      } else {
+        setDocs(prev => {
+            const next = prev.filter(d => d.id !== id)
+            items = next
+            return next
+        })
+      }
 
       if (id === activeDocId) {
         const nextId = items[0]?.id || null
@@ -1341,10 +1593,15 @@ function SettingsIcon({ size = 28 }) {
                         style={{ 
                           flex: 1,
                           textAlign: 'left',
-                          background: d.id === activeDocId ? '#1b1b1f' : undefined
+                          background: d.id === activeDocId ? '#1b1b1f' : undefined,
+                          overflow: 'hidden'
                         }}
                       >
-                        <div style={{ fontWeight: 650 }}>{d.title}</div>
+                        <EditableTitle 
+                          value={d.title} 
+                          onSave={(val) => onUpdateTitle(d.id, val)}
+                          style={{ fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
+                        />
                         <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>{d.filename}</div>
                       </button>
                     </div>
@@ -1356,6 +1613,30 @@ function SettingsIcon({ size = 28 }) {
                             문서 점수 요약
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              className="btn"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setActiveDocId(d.id) // ✅ 설정 대상 문서로 전환
+                                setIsSettingsOpen(true)
+                              }}
+                              disabled={loading || isAnalyzing || isSavingDraft || isUploading}
+                              style={{
+                                padding: '2px 6px',
+                                minWidth: 28,
+                                height: 24,
+                                display: 'grid',
+                                placeItems: 'center',
+                                background: 'rgba(154, 160, 166, 0.12)',
+                                border: '1px solid rgba(154, 160, 166, 0.55)',
+                                color: '#9aa0a6'
+                              }}
+                              title="문서 설정"
+                              aria-label="문서 설정"
+                            >
+                              <SettingsIcon size={14} />
+                            </button>
                             <button
                               className="btn"
                               onClick={(e) => {
@@ -1594,9 +1875,60 @@ function SettingsIcon({ size = 28 }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>
+                {activeDoc ? (
+                  <EditableTitle 
+                    value={activeDoc.title} 
+                    onSave={(val) => onUpdateTitle(activeDoc.id, val)}
+                    style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>선택된 문서 없음</div>
+                )}
+                {/* <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>
                   {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
-                </div>
+                </div> */}
+                {activeDoc && !isEditing && (
+                  <button
+                    onClick={onStartEdit}
+                    disabled={isAnalyzing}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                      color: '#9aa0a6',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="원고 편집"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>편집</span>
+                  </button>
+                )}
+                {activeDoc && isEditing && (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn"
+                      onClick={onSaveEdit}
+                      disabled={loading}
+                      style={{ padding: '2px 8px', fontSize: 12, background: '#1b5e20', borderColor: '#2e7d32', color: '#fff' }}
+                    >
+                      저장
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={onCancelEdit}
+                      disabled={loading}
+                      style={{ padding: '2px 8px', fontSize: 12 }}
+                    >
+                      취소
+                    </button>
+                  </div>
+                )}
               </div>
                             <div
                               onMouseEnter={onLegendEnter}
@@ -1772,14 +2104,35 @@ function SettingsIcon({ size = 28 }) {
 
           <div className="scroll-hide" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             {activeDoc ? (
-              activeAnalysis?.result?.split_sentences ? (
-                <div className="mono" style={{ paddingBottom: 40 }}>
-                  <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
-                </div>
+              isEditing ? (
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="mono"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    resize: 'none',
+                    background: '#0f0f12',
+                    color: '#e6e6ea',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: 15,
+                    lineHeight: 1.8,
+                    padding: 0
+                  }}
+                  autoFocus
+                />
               ) : (
-                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 15 }}>
-                  {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
-                </pre>
+                activeAnalysis?.result?.split_sentences ? (
+                  <div className="mono" style={{ paddingBottom: 40 }}>
+                    <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
+                  </div>
+                ) : (
+                  <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 15 }}>
+                    {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
+                  </pre>
+                )
               )
             ) : (
               <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
@@ -1804,13 +2157,33 @@ function SettingsIcon({ size = 28 }) {
               </button>
             </div>
 
+            <input
+              type="text"
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              placeholder="제목 (선택사항)"
+              className="mono"
+              style={{
+                width: '100%',
+                marginBottom: 8,
+                borderRadius: 4,
+                border: '1px solid #2a2a2c',
+                background: '#0f0f12',
+                color: '#e6e6ea',
+                padding: '10px',
+                outline: 'none',
+                fontSize: 13,
+                boxSizing: 'border-box' // 추가
+              }}
+            />
+
             <textarea
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
               placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
               className="mono"
               style={{
-                width: '96%',
+                width: '100%', // 96% -> 100%
                 height: 140,
                 resize: 'vertical',
                 borderRadius: 8,
@@ -1820,7 +2193,8 @@ function SettingsIcon({ size = 28 }) {
                 padding: 10,
                 outline: 'none',
                 lineHeight: 1.5,
-                fontSize: 12
+                fontSize: 12,
+                boxSizing: 'border-box' // 추가 (기본적으로 적용되지만 명시)
               }}
             />
             <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
@@ -1909,6 +2283,13 @@ function SettingsIcon({ size = 28 }) {
         </div>
       </div>
 
+      {isSettingsOpen && (
+        <SettingsModal 
+          doc={activeDoc} 
+          onClose={() => setIsSettingsOpen(false)} 
+          onSave={onSaveSettings} 
+        />
+      )}
       {docHistoryOpenId && (
         <div
           onClick={() => setDocHistoryOpenId(null)}

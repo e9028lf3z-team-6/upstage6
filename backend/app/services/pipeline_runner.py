@@ -60,7 +60,7 @@ cliche_quality_agent = GenreClicheQualityAgent()
 spelling_quality_agent = SpellingQualityAgent()
 
 
-def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
+def run_full_pipeline(text: str, *, context: dict | None = None, debug: bool = False, mode: str = "full"):
     def _fallback_split_payload(source_text: str) -> dict:
         return build_split_payload(source_text)
 
@@ -78,10 +78,14 @@ def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     persona = None
     reader_context = None
     try:
-        persona = persona_agent.run({
+        persona_input = {
             "text": text,
             "split_sentences": split_result.get("split_sentences", []),
-        })
+        }
+        if context:
+            persona_input.update(context)
+
+        persona = persona_agent.run(persona_input)
         reader_context = persona.get("persona")
     except Exception:
         pass

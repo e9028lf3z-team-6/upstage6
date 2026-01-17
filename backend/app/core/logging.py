@@ -29,23 +29,45 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=True)
 
 
+class TextFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created))
+        
+        # [PROGRESS] 태그가 있는 경우 별도 표시 (예: 색상 코드 추가 가능하나 여기선 단순화)
+        message = record.getMessage()
+        if "[PROGRESS]" in message:
+            message = f"🚀 {message}"
+            
+        return f"[{timestamp}] [{record.levelname:<5}] [{record.name}] {message}"
+
+
 def setup_logging() -> None:
     level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_format = os.getenv("LOG_FORMAT", "json").lower()
-    formatter = "json" if log_format == "json" else "console"
+    log_format = os.getenv("LOG_FORMAT", "text").lower()  # Default to text for local dev
+    formatter = "json" if log_format == "json" else "text"
 
     logging.config.dictConfig({
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
             "json": {"()": JsonFormatter},
-            "console": {"format": "%(levelname)s %(name)s: %(message)s"},
+            "text": {"()": TextFormatter},
         },
         "handlers": {
             "default": {
                 "class": "logging.StreamHandler",
                 "formatter": formatter,
+                "stream": "ext://sys.stdout",
             },
         },
-        "root": {"handlers": ["default"], "level": level},
+        "loggers": {
+            "root": {"handlers": ["default"], "level": level},
+            "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+            "uvicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
+            "uvicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+            # Reduce noise from external libraries
+            "httpx": {"handlers": ["default"], "level": "WARNING", "propagate": False},
+            "httpcore": {"handlers": ["default"], "level": "WARNING", "propagate": False},
+            "openai": {"handlers": ["default"], "level": "WARNING", "propagate": False},
+        },
     })
