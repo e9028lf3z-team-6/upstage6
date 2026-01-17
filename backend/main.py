@@ -51,18 +51,20 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def log_requests(request, call_next):
         started_at = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = int((time.perf_counter() - started_at) * 1000)
-        logger.info(
-            "request",
-            extra={
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-                "duration_ms": duration_ms,
-            },
-        )
-        return response
+        try:
+            response = await call_next(request)
+            duration_ms = int((time.perf_counter() - started_at) * 1000)
+            logger.info(
+                f"{request.method} {request.url.path} {response.status_code} ({duration_ms}ms)"
+            )
+            return response
+        except Exception as e:
+            duration_ms = int((time.perf_counter() - started_at) * 1000)
+            logger.error(
+                f"{request.method} {request.url.path} 500 ({duration_ms}ms) - Exception: {str(e)}",
+                exc_info=True
+            )
+            raise e
 
     # -------------------------
     # Health check

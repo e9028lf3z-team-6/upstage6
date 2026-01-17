@@ -16,7 +16,6 @@ async function request(path, options = {}) {
   if (!r.ok) {
     if (r.status === 401) {
       localStorage.removeItem('token');
-      // Optional: redirect to login or refresh page
     }
     throw new Error(await r.text());
   }
@@ -30,11 +29,19 @@ export async function listDocuments() {
 export async function uploadDocument(file) {
   const fd = new FormData();
   fd.append('file', file);
-  return request('/documents/upload', { method:'POST', body: fd });
+  return request('/documents/upload', { method: 'POST', body: fd });
 }
 
 export async function getDocument(id) {
   return request(`/documents/${id}`);
+}
+
+export async function updateDocument(id, updates) {
+  return request(`/documents/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
 }
 
 export async function deleteDocument(id) {
