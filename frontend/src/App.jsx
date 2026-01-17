@@ -1524,6 +1524,35 @@ function SettingsIcon({ size = 28 }) {
     pushToast('docx로 저장했습니다.', 'success')
   }
 
+  function exportAsHwp() {
+    const text = (activeDoc?.extracted_text || '').trim()
+    if (!text) {
+      pushToast('내보낼 텍스트가 없습니다.', 'warning')
+      return
+    }
+
+    // Simple HTML wrapper for HWP compatibility
+    const htmlContent = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>${docTitleBase}</title>
+<style>
+  body { font-family: "HamChorom Batang", "Malgun Gothic", serif; line-height: 1.6; }
+  p { margin: 0; padding: 0; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+${text.split(/\r?\n/).map(line => line.trim() ? '<p>' + line + '</p>' : '<p>&nbsp;</p>').join('\n')}
+</body>
+</html>`
+
+    const blob = new Blob([htmlContent], { type: 'application/x-hwp;charset=utf-8' })
+    const filename = `${docTitleBase}_${makeTimestampName('export')}.hwp`
+    downloadBlob(blob, filename)
+    pushToast('hwp로 저장했습니다.', 'success')
+  }
+
   function onDownloadEnter() {
     if (downloadCloseTimer.current) {
       clearTimeout(downloadCloseTimer.current)
@@ -2437,10 +2466,24 @@ function SettingsIcon({ size = 28 }) {
                       style={{
                         width: '100%',
                         justifyContent: 'flex-start',
-                        textAlign: 'left'
+                        textAlign: 'left',
+                        marginBottom: 6
                       }}
                     >
                       docx로 내보내기
+                    </button>
+
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => { setIsDownloadOpen(false); exportAsHwp() }}
+                      style={{
+                        width: '100%',
+                        justifyContent: 'flex-start',
+                        textAlign: 'left'
+                      }}
+                    >
+                      hwp로 내보내기
                     </button>
                   </div>
                 )}
