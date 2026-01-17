@@ -19,6 +19,14 @@ function pretty(obj) {
   try { return JSON.stringify(obj, null, 2) } catch { return String(obj) }
 }
 
+function convertRgbaToRgb(rgbaString) {
+  const parts = rgbaString.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+  if (parts && parts.length === 5) {
+    return `rgb(${parts[1]}, ${parts[2]}, ${parts[3]})`;
+  }
+  return rgbaString; // Return original if not rgba
+}
+
 function Badge({ children }) {
   return (
     <span style={{
@@ -35,16 +43,16 @@ function Badge({ children }) {
 }
 
 const ISSUE_COLORS = {
-  tone: 'rgba(0, 150, 136, 0.4)',
-  logic: 'rgba(255, 202, 40, 0.4)',
-  causality: 'rgba(255, 202, 40, 0.4)',
-  trauma: 'rgba(239, 83, 80, 0.45)',
-  hate_bias: 'rgba(171, 71, 188, 0.4)',
-  genre_cliche: 'rgba(66, 165, 245, 0.4)',
-  cliche: 'rgba(66, 165, 245, 0.4)',
-  spelling: 'rgba(239, 83, 80, 0.3)',
-  tension: 'rgba(255, 112, 67, 0.4)',
-  default: 'rgba(158, 158, 158, 0.35)'
+  tone: 'rgba(92, 107, 192, 0.5)',    // Indigo
+  logic: 'rgba(255, 214, 0, 0.5)',   // Highlighter Yellow
+  causality: 'rgba(255, 167, 38, 0.5)', // Orange
+  trauma: 'rgba(239, 83, 80, 0.5)',     // Red
+  hate_bias: 'rgba(171, 71, 188, 0.5)',// Purple
+  genre_cliche: 'rgba(66, 165, 245, 0.5)',// Blue
+  cliche: 'rgba(38, 198, 218, 0.5)',   // Turquoise
+  spelling: 'rgba(236, 64, 122, 0.5)', // Pink
+  tension: 'rgba(139, 195, 74, 0.5)',  // Light Green
+  default: 'rgba(189, 189, 189, 0.4)'  // Grey
 }
 
 function HighlightedText({ text, analysisResult, setTooltip }) {
@@ -95,7 +103,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
     })
 
     if (highlightItems.length === 0) {
-      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+      return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 15 }}>{text}</div>
     }
 
     const boundaries = new Set([0, textLen])
@@ -115,7 +123,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
       segments.push({ start, end, text: segmentText, issues })
     }
 
-    const handleMouseEnter = (e, issues) => {
+    const handleMouseEnter = (e, issues, borderColor) => {
       const content = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {issues.map((issue, i) => {
@@ -125,7 +133,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
               <div key={i}>
                 <strong style={{
                   textTransform: 'capitalize',
-                  color: ISSUE_COLORS[agent] ? '#fff' : '#cfcfd6',
+                  color: ISSUE_COLORS[agent] ? '#fff' : '#000',
                   background: ISSUE_COLORS[agent] || 'transparent',
                   padding: '1px 4px',
                   borderRadius: 3,
@@ -137,11 +145,11 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
           })}
         </div>
       )
-      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+      setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor: convertRgbaToRgb(borderColor) })
     }
 
     return (
-      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
+      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
         {segments.map(segment => {
           if (!segment.issues.length) {
             return <span key={`${segment.start}-${segment.end}`}>{segment.text}</span>
@@ -159,7 +167,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
             <mark
               key={`${segment.start}-${segment.end}`}
               style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
-              onMouseEnter={(e) => handleMouseEnter(e, sortedIssues)}
+              onMouseEnter={(e) => handleMouseEnter(e, sortedIssues, color)}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
@@ -172,7 +180,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   }
 
   if (!analysisResult?.split_sentences || !analysisResult?.split_map) {
-    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+    return <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 15 }}>{text}</div>
   }
 
   // ... (fallback logic, can be updated later if needed)
@@ -194,7 +202,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   collect(analysisResult.spelling, 'spelling')
   collect(analysisResult.tension_curve, 'tension')
 
-  const handleMouseEnterSimple = (e, issue) => {
+  const handleMouseEnterSimple = (e, issue, borderColor) => {
     const content = (
       <div>
         <strong style={{
@@ -208,7 +216,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
         <span>{issue.reason || issue.suggestion || 'Issue found'}</span>
       </div>
     )
-    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY })
+    setTooltip({ visible: true, content, x: e.clientX, y: e.clientY, borderColor: convertRgbaToRgb(borderColor) })
   }
 
   const issuesBySentence = {}
@@ -222,7 +230,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   })
 
   return (
-    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 13 }}>
+    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
       {sentences.map((sent, idx) => {
         const sentIssues = issuesBySentence[idx] || []
         if (sentIssues.length === 0) {
@@ -247,7 +255,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
             <mark
               key={`iss-${i}`}
               style={{ backgroundColor: color, color: '#fff', padding: '0 2px', borderRadius: 2, cursor: 'help' }}
-              onMouseEnter={(e) => handleMouseEnterSimple(e, issue)}
+              onMouseEnter={(e) => handleMouseEnterSimple(e, issue, color)}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
@@ -299,7 +307,7 @@ function formatDisplayTimestamp(value) {
   if (!value) return ''
   const raw = String(value).trim()
   const tzPattern = /([zZ]|[+\-]\d{2}:?\d{2})$/
-  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+  const baseMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/)
 
   let dateStringToParse = raw
   if (baseMatch && !tzPattern.test(raw)) {
@@ -332,31 +340,55 @@ function scoreColor(score) {
   return '#f44336'
 }
 
-function Tooltip({ content, position, visible }) {
+function Tooltip({ content, position, visible, borderColor }) {
   if (!visible || !content) return null
+
   return (
+
     <div style={{
+
       position: 'fixed',
+
       top: position.y + 12,
+
       left: position.x + 12,
+
       maxWidth: 320,
+
       padding: '8px 12px',
-      background: '#1f1f23',
-      border: '1px solid #3a3a3f',
+
+      background: '#d0d0d0',
+
+      border: `5px solid ${borderColor || '#555'}`,
+
       borderRadius: 8,
-      color: '#e6e6ea',
+
+      color: '#000',
+
       fontSize: 12,
+
       lineHeight: 1.5,
+
       whiteSpace: 'pre-wrap',
+
       zIndex: 1500,
+
       pointerEvents: 'none',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
-      transition: 'opacity 0.1s ease',
+
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+
+      transition: 'opacity 0.1s ease, border-color 0.1s ease',
+
       opacity: visible ? 1 : 0,
+
     }}>
+
       {content}
+
     </div>
+
   )
+
 }
 
 const TOAST_STYLES = {
@@ -366,12 +398,18 @@ const TOAST_STYLES = {
   error: { borderColor: '#d32f2f', background: 'rgba(211, 47, 47, 0.45)' }
 }
 
+
+
 const PERSONA_LEGEND = [
-  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'tone', label: '어조 에이전트' },
+  { key: 'logic', label: '논리 에이전트' },
   { key: 'causality', label: '개연성 에이전트' },
+  { key: 'trauma', label: '트라우마 에이전트' },
   { key: 'hate_bias', label: '혐오·편향 에이전트' },
-  { key: 'cliche', label: '장르 클리셰 에이전트' },
-  { key: 'tension', label: '긴장도 에이전트' }
+  { key: 'genre_cliche', label: '장르 클리셰 에이전트' },
+  { key: 'cliche', label: '클리셰 에이전트' },
+  { key: 'spelling', label: '맞춤법 에이전트' },
+  { key: 'tension', label: '긴장도 에이전트' },
 ]
 
 export default function App() {
@@ -391,13 +429,14 @@ export default function App() {
   // settings
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
+  const [topic, setTopic] = useState('소설')
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
   })
 
   const [toasts, setToasts] = useState([])
-  const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0 })
+  const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0, borderColor: null })
 
   const [leftMode, setLeftMode] = useState('list')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -413,6 +452,8 @@ export default function App() {
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
+  const [isDraftInputOpen, setIsDraftInputOpen] = useState(false)
   const planLabel = ''
   const userDisplayName = user?.name || '사용자'
   const userInitial = (userDisplayName || '').trim().slice(0, 1) || 'U'
@@ -791,19 +832,20 @@ export default function App() {
     await uploadOneFile(file)
   }
 
-  function SettingsIcon() {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
-        <path
-          d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
+function SettingsIcon({ size = 28 }) {
+  return (
+
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 
   // toggle sizes
@@ -898,7 +940,7 @@ export default function App() {
 
   return (
     <>
-      <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} />
+      <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} borderColor={tooltip.borderColor} />
       <style>{`
         body {
           scrollbar-width: none;
@@ -1015,12 +1057,13 @@ export default function App() {
       `}</style>
       <div className="scroll-hide main-layout" style={{
         display: 'grid',
-        gridTemplateColumns: '300px 1fr 480px',
+        gridTemplateColumns: `300px 1fr ${isRightPanelOpen ? '480px' : '0px'}`,
         height: '100vh',
         gap: 8,
         background: '#0f0f12',
         filter: theme === 'light' ? 'invert(1) hue-rotate(180deg)' : 'none',
-        transition: 'filter 0.2s ease'
+        transition: 'grid-template-columns 0.3s ease-in-out, filter 0.2s ease',
+        overflow: 'hidden'
       }}>
         {/* Toast notifications */}
         {toasts.length > 0 && (
@@ -1207,9 +1250,6 @@ export default function App() {
                 }}>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>설정</div>
-                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      설정 내용은 나중에 추가할 것
-                    </div>
                   </div>
                 </div>
 
@@ -1222,93 +1262,9 @@ export default function App() {
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: 16 }}>페르소나 갯수</div>
-                          <div className="muted" style={{ fontSize: 12 }}>1(디폴트 3) 최대 5</div>
-                        </div>
-                        <span className="mono" style={{
-                          padding: '4px 10px',
-                          borderRadius: 10,
-                          border: '1px solid #2a2a2c',
-                          background: '#141417',
-                          fontSize: 13,
-                          fontWeight: 900,
-                          color: '#e6e6ea',
-                          minWidth: 44,
-                          textAlign: 'center'
-                        }}>
-                          {personaCount}명
-                        </span>
-                      </div>
 
-                      <div>
-                        <input
-                          type="range"
-                          min={1}
-                          max={5}
-                          step={1}
-                          value={personaCount}
-                          onChange={(e) => setPersonaCount(Number(e.target.value))}
-                          style={{ width: '100%', boxSizing: 'border-box', padding: 0 }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                          <span className="muted" style={{ fontSize: 11 }}>1</span>
-                          <span className="muted" style={{ fontSize: 11 }}>5</span>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: 16 }}>집중 모드</div>
-                        <div className="muted" style={{ fontSize: 12 }}>창의성 ↔ 직관성</div>
-                      </div>
 
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => setCreativeFocus(prev => !prev)}
-                        aria-pressed={creativeFocus}
-                        style={{
-                          minWidth: 150,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                          padding: '6px 10px'
-                        }}
-                      >
-                        <span style={{ fontSize: 12, fontWeight: 800 }}>
-                          {creativeFocus ? '창의성 중심' : '직관성'}
-                        </span>
-
-                        <span aria-hidden="true" style={{
-                          width: SWITCH_W,
-                          height: SWITCH_H,
-                          borderRadius: 999,
-                          background: creativeFocus ? '#66bb6a' : '#555',
-                          position: 'relative',
-                          display: 'inline-block',
-                          padding: SWITCH_PAD,
-                          boxSizing: 'border-box',
-                          transition: 'background 0.18s ease',
-                          border: '1px solid #2a2a2c'
-                        }}>
-                          <span style={{
-                            width: KNOB,
-                            height: KNOB,
-                            borderRadius: '50%',
-                            background: '#0f0f12',
-                            display: 'block',
-                            transform: creativeFocus ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
-                            transition: 'transform 0.18s ease',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
-                          }} />
-                        </span>
-                      </button>
-                    </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                       <div>
@@ -1375,10 +1331,14 @@ export default function App() {
                       <button
                         className="btn"
                         onClick={() => {
-                          setActiveDocId(d.id)
-                          openLatestDocScore(d.id)
+                          if (docScoreOpenId === d.id) {
+                            setDocScoreOpenId(null)
+                          } else {
+                            setActiveDocId(d.id)
+                            openLatestDocScore(d.id)
+                          }
                         }}
-                        style={{
+                        style={{ 
                           flex: 1,
                           textAlign: 'left',
                           background: d.id === activeDocId ? '#1b1b1f' : undefined
@@ -1515,7 +1475,24 @@ export default function App() {
           {/* Error banner */}
           {error && (
             <div className="card" style={{ marginTop: 12, padding: 12, borderColor: '#5a2a2a', background: '#1a0f10' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
+                <button
+                  onClick={() => setError(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    fontSize: 20,
+                    lineHeight: 0.8,
+                    padding: '0 4px'
+                  }}
+                  title="오류 숨기기"
+                >
+                  &times;
+                </button>
+              </div>
               <div className="mono" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{error}</div>
             </div>
           )}
@@ -1526,9 +1503,9 @@ export default function App() {
             paddingTop: 10,
             borderTop: '1px solid #333'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               {user ? (
-                <div className="account-bar">
+                <div className="account-bar" style={{ flexGrow: 1 }}>
                   <div className="account-avatar">
                     {user.picture ? (
                       <img src={user.picture} alt={userDisplayName} style={{ width: '100%', height: '100%' }} />
@@ -1542,7 +1519,7 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="account-bar" onClick={onLogin} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+                <div className="account-bar" onClick={onLogin} role="button" tabIndex={0} style={{ cursor: 'pointer', flexGrow: 1 }}>
                   <div className="account-avatar">?</div>
                   <div className="account-meta">
                     <div className="account-name">Login</div>
@@ -1551,50 +1528,63 @@ export default function App() {
                   <span className="account-pill">Sign in</span>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={onLogout}
-                  title="Logout"
-                  aria-label="Logout"
-                  disabled={!user}
-                  style={{
-                    width: 38,
-                    height: 38,
-                    display: 'grid',
-                    placeItems: 'center',
-                    opacity: user ? 1 : 0.45,
-                    cursor: user ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                    <path d="M10 17l5-5-5-5" />
-                    <path d="M15 12H3" />
-                  </svg>
-                </button>
 
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={openSettingsPanel}
-                  title="Settings"
-                  aria-label="Settings"
-                  aria-pressed={leftMode === 'settings'}
-                  style={{
-                    width: 38,
-                    height: 38,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginLeft: -4,
-                    background: leftMode === 'settings' ? '#2a2a2c' : undefined
-                  }}
-                >
-                  <SettingsIcon />
-                </button>
-              </div>
+              {user && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 0,
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingRight: 8
+                }}>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={onLogout}
+                    title="Logout"
+                    aria-label="Logout"
+                    disabled={!user}
+                    style={{
+                      width: 38,
+                      height: 38,
+                      display: 'grid',
+                      placeItems: 'center',
+                      opacity: user ? 1 : 0.45,
+                      background: '#1a0f10',
+                      color: '#ef5350'
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <path d="M10 17l5-5-5-5" />
+                      <path d="M15 12H3" />
+                    </svg>
+                  </button>
+
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={openSettingsPanel}
+                    title="Settings"
+                    aria-label="Settings"
+                    aria-pressed={leftMode === 'settings'}
+                    style={{
+                      width: 38,
+                      height: 38,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      background: leftMode === 'settings' ? '#2a2a2c' : undefined
+                    }}
+                  >
+                    {/* 아이콘 크기를 28로 설정하여 버튼(38px)에 꽉 차게 만듦 */}
+                    <SettingsIcon size={38} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1608,67 +1598,67 @@ export default function App() {
                   {activeDoc ? `${activeDoc.title} · ${activeDoc.filename}` : '선택된 문서 없음'}
                 </div>
               </div>
-              <div
-                onMouseEnter={onLegendEnter}
-                onMouseLeave={onLegendLeave}
-                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-              >
-                <span style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#cfcfd6',
-                  padding: '3px 8px',
-                  borderRadius: 8,
-                  border: '1px solid #2a2a2c',
-                  background: '#16161a'
-                }}>
-                  에이전트
-                </span>
-
-                {isLegendOpen && (
-                  <div
-                    className="card"
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 6px)',
-                      left: 0,
-                      minWidth: 180,
-                      padding: 10,
-                      border: '2px solid #2a2a2c',
-                      background: '#0f0f12',
-                      zIndex: 60,
-                      boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
-                    }}
-                  >
-                    <div style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: '#888',
-                      marginBottom: 8,
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5
-                    }}>
-                      Agents by Color
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {PERSONA_LEGEND.map(item => (
-                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 3,
-                            background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
-                            border: '1px solid #444'
-                          }} />
-                          <span className="mono" style={{ fontSize: 12, color: '#cfcfd6' }}>
-                            {item.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                            <div
+                              onMouseEnter={onLegendEnter}
+                              onMouseLeave={onLegendLeave}
+                              style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                              <span style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: '#cfcfd6',
+                                padding: '3px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #2a2a2c',
+                                background: '#16161a'
+                              }}>
+                                에이전트
+                              </span>
+              
+                              {isLegendOpen && (
+                                <div
+                                  className="card"
+                                  style={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 6px)',
+                                    left: 0,
+                                    minWidth: 180,
+                                    padding: 10,
+                                    border: '2px solid #2a2a2c',
+                                    background: '#0f0f12',
+                                    zIndex: 60,
+                                    boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
+                                  }}
+                                >
+                                  <div style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#888',
+                                    marginBottom: 8,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 0.5
+                                  }}>
+                                    Agents by Color
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    {PERSONA_LEGEND.map(item => (
+                                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ 
+                                          width: 10,
+                                          height: 10,
+                                          borderRadius: 3,
+                                          background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
+                                          border: '1px solid #444'
+                                        }} />
+                                        <span className="mono" style={{ fontSize: 12, color: '#cfcfd6' }}>
+                                          {item.label}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
             </div>
 
             {/* 실행 버튼 + 내보내기 hover 메뉴 */}
@@ -1682,10 +1672,15 @@ export default function App() {
                 style={{
                   opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
                   cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
-                  marginRight: 6
+                  display: 'grid', placeItems: 'center', // Center the icon
+                  padding: 8, // Make it square
                 }}
               >
-                {isAnalyzing ? '분석 중…' : (user ? '분석 실행' : '분석 실행 (개연성 Only)')}
+                {isAnalyzing ? '분석 중…' : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#4CAF50" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                )}
               </button>
 
               <div
@@ -1700,14 +1695,17 @@ export default function App() {
                   style={{
                     opacity: !activeDoc ? 0.6 : 1,
                     cursor: !activeDoc ? 'not-allowed' : 'pointer',
-                    paddingLeft: 12,
-                    paddingRight: 12
+                    display: 'grid', placeItems: 'center', // Center the icon
+                    padding: 8, // Make it square
                   }}
                   title="내보내기"
                 >
-                  내보내기
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
                 </button>
-
                 {isDownloadOpen && activeDoc && (
                   <div
                     className="card"
@@ -1752,6 +1750,21 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              <button
+                className="btn"
+                onClick={() => setIsRightPanelOpen(prev => !prev)}
+                title="보고서 패널 토글"
+                style={{ padding: 8, display: 'grid', placeItems: 'center' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -1764,7 +1777,7 @@ export default function App() {
                   <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
                 </div>
               ) : (
-                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 12 }}>
+                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 15 }}>
                   {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
                 </pre>
               )
@@ -1817,7 +1830,15 @@ export default function App() {
         </div>
 
         {/* Right panel */}
-        <div className="card scroll-hide right-panel" style={{ padding: 8, overflow: 'auto' }}>
+        <div
+          className="card right-panel"
+          style={{
+            padding: 8,
+            overflow: isRightPanelOpen ? 'auto' : 'hidden',
+            opacity: isRightPanelOpen ? 1 : 0,
+            transition: 'opacity 0.2s ease-in-out'
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>분석 결과</div>
@@ -1836,10 +1857,11 @@ export default function App() {
               )}
 
               {canShowJson && rightView === 'json' && (
-                <button className="btn" onClick={() => setRightView('report')}>
+                <button className="btn" onClick={() => setRightView('report')}> 
                   돌아오기
                 </button>
               )}
+
             </div>
           </div>
 
@@ -2019,4 +2041,3 @@ export default function App() {
     </>
   )
 }
-
