@@ -12,7 +12,17 @@ def summary_node(state: AgentState) -> AgentState:
     
     # original_text 또는 split_text를 기반으로 요약
     text = state.get("original_text") or ""
-    summary = summary_agent.run(text)
+    
+    try:
+        if not text or not text.strip():
+            return {"global_summary": "요약할 텍스트가 없습니다."}
+            
+        summary = summary_agent.run(text)
+        if not summary:
+            summary = text[:100] + "..." # Fallback: first 100 chars
+    except Exception as e:
+        logger.error(f"Error in summary_node: {e}")
+        summary = f"요약 생성 중 오류 발생: {str(e)}"
     
     return {
         "global_summary": summary
