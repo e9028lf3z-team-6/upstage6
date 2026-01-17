@@ -44,12 +44,10 @@ function Badge({ children }) {
 
 const ISSUE_COLORS = {
   tone: 'rgba(92, 107, 192, 0.5)',    // Indigo
-  logic: 'rgba(255, 214, 0, 0.5)',   // Highlighter Yellow
-  causality: 'rgba(255, 167, 38, 0.5)', // Orange
+  logic: 'rgba(255, 167, 38, 0.5)',   // Orange (logic/causality)
   trauma: 'rgba(239, 83, 80, 0.5)',     // Red
   hate_bias: 'rgba(171, 71, 188, 0.5)',// Purple
   genre_cliche: 'rgba(66, 165, 245, 0.5)',// Blue
-  cliche: 'rgba(38, 198, 218, 0.5)',   // Turquoise
   spelling: 'rgba(236, 64, 122, 0.5)', // Pink
   tension: 'rgba(139, 195, 74, 0.5)',  // Light Green
   default: 'rgba(189, 189, 189, 0.4)'  // Grey
@@ -195,7 +193,6 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
   }
   collect(analysisResult.tone, 'tone')
   collect(analysisResult.logic, 'logic')
-  collect(analysisResult.causality, 'causality')
   collect(analysisResult.trauma, 'trauma')
   collect(analysisResult.hate_bias, 'hate_bias')
   collect(analysisResult.genre_cliche, 'genre_cliche')
@@ -402,12 +399,10 @@ const TOAST_STYLES = {
 
 const PERSONA_LEGEND = [
   { key: 'tone', label: '어조 에이전트' },
-  { key: 'logic', label: '논리 에이전트' },
-  { key: 'causality', label: '개연성 에이전트' },
+  { key: 'logic', label: '논리/개연성 에이전트' },
   { key: 'trauma', label: '트라우마 에이전트' },
   { key: 'hate_bias', label: '혐오·편향 에이전트' },
   { key: 'genre_cliche', label: '장르 클리셰 에이전트' },
-  { key: 'cliche', label: '클리셰 에이전트' },
   { key: 'spelling', label: '맞춤법 에이전트' },
   { key: 'tension', label: '긴장도 에이전트' },
 ]
