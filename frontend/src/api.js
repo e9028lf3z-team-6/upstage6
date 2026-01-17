@@ -37,6 +37,7 @@ export async function getDocument(id) {
   return request(`/documents/${id}`);
 }
 
+<<<<<<< HEAD
 export async function updateDocument(id, updates) {
   return request(`/documents/${id}`, {
     method: 'PATCH',
@@ -45,10 +46,13 @@ export async function updateDocument(id, updates) {
   });
 }
 
+=======
+>>>>>>> origin/frontend
 export async function deleteDocument(id) {
   return request(`/documents/${id}`, { method: 'DELETE' });
 }
 
+<<<<<<< HEAD
 export async function runAnalysis(docId, options = {}) {
   const payload = {};
   if (typeof options.personaCount === 'number') {
@@ -67,6 +71,10 @@ export async function runAnalysis(docId, options = {}) {
         }
       : {}),
   });
+=======
+export async function runAnalysis(docId) {
+  return request(`/analysis/run/${docId}`, { method:'POST' });
+>>>>>>> origin/frontend
 }
 
 export async function getAnalysis(id) {
@@ -89,4 +97,8 @@ export async function getMe() {
 export function logout() {
   localStorage.removeItem('token');
   window.location.href = '/';
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> origin/frontend
