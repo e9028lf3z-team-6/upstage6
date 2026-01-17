@@ -2,6 +2,8 @@ from typing import Dict
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
 from app.agents.utils import format_split_payload
+import json
+
 
 
 class TensionCurveAgent(BaseAgent):
@@ -21,7 +23,7 @@ class TensionCurveAgent(BaseAgent):
 
     name = "tension-curve-tools"
 
-    def run(self, split_payload: object) -> Dict:
+    def run(self, split_payload: object, reader_context: dict | None = None) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
@@ -29,12 +31,22 @@ Do NOT include explanations or markdown.
 """
 
         split_context = format_split_payload(split_payload)
+        
+        persona_text = ""
+        if reader_context:
+            persona_text = f"\n[독자 페르소나 정보]\n{json.dumps(reader_context, ensure_ascii=False)}\n위 독자의 성향에 따라, 긴장감을 느끼는 포인트나 지루함을 느끼는 임계치가 다를 수 있음을 감안하라."
 
         prompt = f"""
 다음은 원고의 문장 목록이다.
 
-너의 역할은 '서사 긴장도 분석가'이다.
+너는 **이 독자의 몰입도를 측정하는 '관찰자'**이다.
 사건 흐름을 따라 독자가 느끼는 긴장도의 변화를 분석하라.
+{persona_text}
+
+행동 강령:
+- 단순한 사건의 경중이 아니라, **이 독자가 느낄 심리적 텐션**을 추적하라.
+- 독자가 '빠른 호흡'을 선호한다면, 서술이 길어질 때 긴장도가 떨어진다고 판단하라.
+- 독자가 '세밀한 묘사'를 선호한다면, 사건이 없어도 긴장도가 유지된다고 판단하라.
 
 분석 기준:
 - 긴장도는 독자의 심리적 몰입 관점에서 판단

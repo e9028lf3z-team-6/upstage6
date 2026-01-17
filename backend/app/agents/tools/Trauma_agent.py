@@ -12,7 +12,7 @@ class TraumaAgent(BaseAgent):
 
     name = "trauma-tools"
 
-    def run(self, split_payload: object) -> Dict:
+    def run(self, split_payload: object, reader_context: dict | None = None) -> Dict:
         from app.agents.utils import extract_split_payload
         _, sentences = extract_split_payload(split_payload)
         
@@ -25,7 +25,7 @@ class TraumaAgent(BaseAgent):
             
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
-                executor.submit(self._analyze_chunk, chunk, idx)
+                executor.submit(self._analyze_chunk, chunk, idx, reader_context)
                 for chunk, idx in chunks
             ]
             
@@ -45,20 +45,26 @@ class TraumaAgent(BaseAgent):
             "note": f"Analyzed {len(sentences)} sentences in {len(chunks)} chunks (Parallel)"
         }
 
-    def _analyze_chunk(self, chunk: list[str], start_index: int) -> dict:
+    def _analyze_chunk(self, chunk: list[str], start_index: int, reader_context: dict | None = None) -> dict:
         system = """
 You are a strict JSON generator. You MUST output valid JSON only.
 """
         import json
         split_context = json.dumps(chunk, ensure_ascii=False)
+        
+        persona_text = ""
+        if reader_context:
+            persona_text = f"\n[독자 특이사항]\n{json.dumps(reader_context, ensure_ascii=False)}\n위 독자가 특별히 민감할 수 있는 트리거(공포, 불안 등)를 더욱 주의깊게 살필 것."
 
         prompt = f"""
-너는 '트라우마 위험 표현 탐지기'이다.
+너는 단순한 탐지기가 아니라, **이 독자의 심리적 안전을 책임지는 '보호자(Guardian)'**이다.
 입력은 문장 배열(JSON)이며, 시작 인덱스는 {start_index}이다.
 각 이슈의 sentence_index는 {start_index} + (청크 내 인덱스)여야 한다.
 
 목표:
-- 독자에게 심리적 충격, 불안, 트라우마를 유발할 가능성이 있는 표현(재난, 폭력, 위험행동 등) 식별
+- 독자에게 심리적 충격, 불안, 트라우마를 유발할 가능성이 있는 표현을 식별하라.
+- 특히 **[독자 특이사항]에 명시된 트리거**에 대해서는, 일반인 기준보다 훨씬 더 엄격하고 민감하게 반응해야 한다.
+{persona_text}
 
 출력 JSON 형식:
 {{

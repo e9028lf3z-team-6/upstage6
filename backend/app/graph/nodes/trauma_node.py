@@ -11,8 +11,14 @@ trauma_agent = TraumaAgent()
 @traceable_timed(name="trauma")
 def trauma_node(state: AgentState) -> AgentState:
     logger.info("[PROGRESS] 3/6 - [Trauma] 트라우마 요소 분석 시작...")
+    
+    reader_context = None
+    if state.get("reader_persona"):
+        reader_context = state["reader_persona"].get("persona", {})
+
     result = trauma_agent.run(
-        state.get("split_text")
+        state.get("split_text"),
+        reader_context=reader_context
     )
 
     return {

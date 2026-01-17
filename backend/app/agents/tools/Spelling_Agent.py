@@ -12,7 +12,7 @@ class SpellingAgent(BaseAgent):
 
     name = "spelling-agent"
 
-    def run(self, split_payload: object) -> dict:
+    def run(self, split_payload: object, reader_context: dict | None = None) -> dict:
         _, sentences = extract_split_payload(split_payload)
         
         all_issues = []
@@ -24,7 +24,7 @@ class SpellingAgent(BaseAgent):
             
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
-                executor.submit(self._analyze_chunk, chunk, idx)
+                executor.submit(self._analyze_chunk, chunk, idx, reader_context)
                 for chunk, idx in chunks
             ]
             
@@ -45,15 +45,21 @@ class SpellingAgent(BaseAgent):
             "note": f"Analyzed {len(sentences)} sentences in {len(chunks)} chunks (Parallel)"
         }
 
-    def _analyze_chunk(self, chunk: list[str], start_index: int) -> dict:
+    def _analyze_chunk(self, chunk: list[str], start_index: int, reader_context: dict | None = None) -> dict:
         system = """
 너는 창작물 교정 보조 시스템이다. 문학적 허용과 구어체를 존중하며, 명백한 오류만 찾아내야 한다.
 반드시 JSON만 출력한다.
 """
         split_context = json.dumps(chunk, ensure_ascii=False)
+        
+        persona_text = ""
+        if reader_context:
+            persona_text = f"\n[독자 특이사항]\n{json.dumps(reader_context, ensure_ascii=False)}\n위 독자의 성향을 참고하되, 맞춤법은 표준 규범을 우선으로 판단하라."
+
         prompt = f"""
 입력은 원고의 문장 배열(JSON)이다. 시작 인덱스는 {start_index}이다.
 각 문장의 sentence_index는 {start_index} + (배열 인덱스)이다.
+{persona_text}
 
 [분석 지침]
 1. **탐지 대상**:

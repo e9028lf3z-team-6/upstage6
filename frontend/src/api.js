@@ -37,6 +37,14 @@ export async function getDocument(id) {
   return request(`/documents/${id}`);
 }
 
+export async function updateDocument(id, updates) {
+  return request(`/documents/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+}
+
 export async function deleteDocument(id) {
   return request(`/documents/${id}`, { method: 'DELETE' });
 }

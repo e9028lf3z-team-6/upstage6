@@ -5,7 +5,7 @@ from typing import TypedDict, Optional, Dict, Any, List, Union
 class AgentState(TypedDict, total=False):
     # entry
     original_text: str
-    context: Optional[str]
+    context: Optional[Union[str, Dict[str, Any]]]
 
     # preprocessing
     split_text: Optional[Union[List[str], Dict[str, Any], str]]

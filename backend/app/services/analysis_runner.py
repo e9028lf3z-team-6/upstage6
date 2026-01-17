@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 import logging
+import json
 
 from app.core.settings import get_settings
 from app.graph.graph import agent_app
@@ -62,9 +63,25 @@ def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) 
 
 async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
     logger.info("[DEBUG] _run_langgraph_full: Preparing initial state.")
+    
+    context_dict = {}
+    if context is not None:
+        try:
+            if isinstance(context, dict):
+                context_dict = context
+            elif isinstance(context, str):
+                if context.strip():  # 빈 문자열 체크
+                    context_dict = json.loads(context)
+            else:
+                logger.warning(f"Unexpected context type: {type(context)}")
+        except Exception as e:
+            logger.warning(f"Failed to parse context json: {e}")
+
+    logger.info(f"[DEBUG] Context dict prepared: {context_dict.keys()}")
+
     initial_state: AgentState = {
         "original_text": text,
-        "context": context,
+        "context": context_dict,
     }
     logger.info("[DEBUG] _run_langgraph_full: Invoking agent_app (LangGraph).")
     try:
