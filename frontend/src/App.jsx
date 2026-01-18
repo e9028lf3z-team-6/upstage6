@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import Intro from './Intro'
+import Editor from './Editor'
 import {
   deleteAnalysis,
   deleteDocument,
@@ -411,6 +413,7 @@ const PERSONA_LEGEND = [
 ]
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true)
   const [user, setUser] = useState(null)
 
   const [docs, setDocs] = useState([])
@@ -1028,6 +1031,7 @@ function SettingsIcon({ size = 28 }) {
 
   return (
     <>
+      {showIntro && <Intro onFinish={() => setShowIntro(false)} />}
       <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} borderColor={tooltip.borderColor} />
       <style>{`
         body {
@@ -1848,19 +1852,19 @@ function SettingsIcon({ size = 28 }) {
 
           {!user && <div style={{ fontSize: 10, color: '#ffab40' }}>* 전체 분석은 로그인 필요</div>}
 
-          <div className="scroll-hide" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <div className="scroll-hide" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             {activeDoc ? (
-              activeAnalysis?.result?.split_sentences ? (
-                <div className="mono" style={{ paddingBottom: 40 }}>
-                  <HighlightedText text={activeDoc.extracted_text} analysisResult={activeAnalysis.result} setTooltip={setTooltip} />
-                </div>
-              ) : (
-                <pre className="mono" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 15 }}>
-                  {activeDoc.extracted_text || '(텍스트를 추출하지 못했습니다)'}
-                </pre>
-              )
+              <Editor 
+                initialText={activeDoc.extracted_text} 
+                onSave={(newText) => {
+                  // TODO: 자동 저장 로직 구현 (API 연동 필요)
+                  console.log('Text updated:', newText.slice(0, 20) + '...')
+                }}
+                analysisResult={activeAnalysis?.result}
+                setTooltip={setTooltip}
+              />
             ) : (
-              <div className="muted">왼쪽에서 원고를 선택하거나 업로드하세요.</div>
+              <div className="muted" style={{ padding: 20 }}>왼쪽에서 원고를 선택하거나 업로드하세요.</div>
             )}
           </div>
 
