@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    expose:
+      - "8000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/.env:/app/.env
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE=/api
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+# Note: In a production environment, you might want to use Nginx 
+# as a reverse proxy to route /api to backend and other requests to frontend.

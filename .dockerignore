@@ -1,26 +1,12 @@
-# Python
-__pycache__/
+node_modules
+dist
+.env
+__pycache__
 *.pyc
-*.pyo
-*.pyd
-
-# Virtual env
-.venv/
-venv/
-
-# Git
-.git/
-.gitignore
-
-# IDE
-.vscode/
-.idea/
-
-# Tests & local artifacts
-tests/
-scripts/
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
+.venv
+.git
+.idea
+backend/data/*
+!backend/data/.gitkeep
+frontend/node_modules
+frontend/dist
