@@ -3,51 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CONTEXTOR (TEAM)</title>
+    <title>Contextor</title>
+    <!-- 폰트 추가 -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Gothic:wght@400;700;800&family=Nanum+Pen+Script&family=Batang&display=swap" rel="stylesheet">
     <style>
-      :root {
-        /* Light Mode Defaults */
-        --bg-main: #ffffff;
-        --bg-panel: #ffffff;
-        --bg-sidebar: #f4f4f5; /* 사이드바용 약간 어두운 회색 */
-        --bg-card: #e4e4e7;   /* 카드용 더 어두운 회색 */
-        --bg-btn: #e4e4e7;    /* 버튼용 어두운 회색 */
-        --bg-hover: #d4d4d8; 
-        --border: #000000;
-        --text-main: #18181b;
-        --text-muted: #71717a;
-        --shadow: rgba(0, 0, 0, 0.05);
-        --highlight-border: 1px solid #000000;
+      @font-face {
+        font-family: 'MaruBuri';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/naverfont_08@1.0/MaruBuri-Regular.woff2') format('woff2');
+        font-weight: normal;
+        font-style: normal;
       }
-
-      [data-theme="dark"] {
-        /* Dark Mode Defaults */
-        --bg-main: #09090b;
-        --bg-panel: #18181b;
-        --bg-sidebar: #18181b;
-        --bg-card: #27272a;
-        --bg-btn: #27272a;
-        --bg-hover: #3f3f46;
-        --border: #3f3f46;
-        --text-main: #f4f4f5;
-        --text-muted: #a1a1aa;
-        --shadow: rgba(0, 0, 0, 0.3);
-        --highlight-border: none;
-      }
-
-      body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; background: var(--bg-main); color: var(--text-main); transition: background 0.2s, color 0.2s; }
-      .btn { border:2px solid var(--border); background: var(--bg-btn); color: var(--text-main); padding:10px 12px; border-radius:10px; cursor:pointer; transition: background 0.15s, border-color 0.15s; }
-      .btn:hover{ background: var(--bg-hover); }
-      input, textarea { background: var(--bg-panel); color: var(--text-main); border:1px solid var(--border); border-radius:10px; padding:10px; transition: border-color 0.15s; }
-      input:focus, textarea:focus { outline: 2px solid var(--border); }
-      .card { background: var(--bg-panel); border:1px solid var(--border); border-radius:14px; box-shadow: 0 1px 2px var(--shadow); }
-      .muted { color: var(--text-muted); }
-      a { color:#3b82f6; } /* Blue-500 */
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace; }
-      /* Hide scrollbar for Chrome, Safari and Opera */
-      .right-panel::-webkit-scrollbar { display: none; }
-      /* Hide scrollbar for IE, Edge and Firefox */
-      .right-panel { -ms-overflow-style: none;  scrollbar-width: none; }
     </style>
   </head>
   <body>

@@ -11,7 +11,8 @@ import {
   listDocuments,
   runAnalysis,
   runAnalysisStream,
-  uploadDocument
+  uploadDocument,
+  updateDocument
 } from './api.js'
 
 //  docx export
@@ -923,6 +924,13 @@ export default function App() {
     await uploadOneFile(file)
   }
 
+  async function onCreateNewDoc() {
+    const filename = `새 원고_${new Date().toLocaleDateString()}_${new Date().toLocaleTimeString().slice(0,5)}.txt`
+    const blob = new Blob([" "], { type: 'text/plain' })
+    const file = new File([blob], filename, { type: 'text/plain' })
+    await uploadOneFile(file)
+  }
+
 function SettingsIcon({ size = 28 }) {
   return (
 
@@ -1028,6 +1036,8 @@ function SettingsIcon({ size = 28 }) {
       setIsLegendOpen(false)
     }, 180)
   }
+
+  const saveTimeoutRef = useRef(null)
 
   return (
     <>
@@ -1394,7 +1404,24 @@ function SettingsIcon({ size = 28 }) {
             {/* List panel - Always visible if list or settings (behind settings) */}
             {(leftMode === 'list' || leftMode === 'settings') && (
               <>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>원고 목록</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div className="muted" style={{ fontSize: 12 }}>원고 목록</div>
+                  <button 
+                    onClick={onCreateNewDoc}
+                    className="btn"
+                    style={{ 
+                      padding: '2px 8px', 
+                      fontSize: 18, 
+                      fontWeight: 800, 
+                      lineHeight: 1,
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)'
+                    }}
+                    title="새 원고 생성"
+                  >
+                    +
+                  </button>
+                </div>
                 {docs.map(d => (
                   <div key={d.id} style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
@@ -1411,9 +1438,10 @@ function SettingsIcon({ size = 28 }) {
                         style={{ 
                           flex: 1,
                           textAlign: 'left',
-                          paddingTop: 16,
-                          paddingBottom: 16,
-                          background: d.id === activeDocId ? 'var(--bg-hover)' : undefined
+                          paddingTop: 20,
+                          paddingBottom: 20,
+                          background: d.id === activeDocId ? 'var(--bg-hover)' : undefined,
+                          minHeight: 70
                         }}
                       >
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{d.filename}</div>
@@ -1673,244 +1701,34 @@ function SettingsIcon({ size = 28 }) {
 
         {/* Center panel */}
         <div className="card scroll-hide center-panel" style={{ padding: 8, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8, border: '2px solid var(--border)', background: 'var(--bg-panel)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>
-                  {activeDoc ? activeDoc.filename : '선택된 문서 없음'}
-                </div>
-              </div>
-                            <div
-                              onMouseEnter={onLegendEnter}
-                              onMouseLeave={onLegendLeave}
-                              style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-                            >
-                              <span style={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: 'var(--text-main)',
-                                padding: '3px 8px',
-                                borderRadius: 8,
-                                border: '1px solid var(--border)',
-                                background: 'var(--bg-card)'
-                              }}>
-                                에이전트
-                              </span>
-              
-                              {isLegendOpen && (
-                                <div
-                                  className="card"
-                                  style={{
-                                    position: 'absolute',
-                                    top: 'calc(100% + 6px)',
-                                    left: 0,
-                                    minWidth: 180,
-                                    padding: 10,
-                                    border: '2px solid var(--border)',
-                                    background: 'var(--bg-card)',
-                                    zIndex: 60,
-                                    boxShadow: '0 10px 28px rgba(0,0,0,0.45)'
-                                  }}
-                                >
-                                  <div style={{
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    color: 'var(--text-muted)',
-                                    marginBottom: 8,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.5
-                                  }}>
-                                    Agents by Color
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {PERSONA_LEGEND.map(item => (
-                                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span style={{ 
-                                          width: 10,
-                                          height: 10,
-                                          borderRadius: 3,
-                                          background: ISSUE_COLORS[item.key] || ISSUE_COLORS.default,
-                                          border: '1px solid var(--border)'
-                                        }} />
-                                        <span className="mono" style={{ fontSize: 12, color: 'var(--text-main)' }}>
-                                          {item.label}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-            </div>
-
-            {/* 실행 버튼 + 내보내기 hover 메뉴 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 8 }}>
-              {isAnalyzing && <Badge>{formatElapsed(analysisElapsedSec)}</Badge>}
-
-              <button
-                className="btn"
-                onClick={onRunAnalysis}
-                disabled={!activeDocId || isAnalyzing || isUploading || isSavingDraft}
-                style={{
-                  opacity: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 0.7 : 1,
-                  cursor: (!activeDocId || isAnalyzing || isUploading || isSavingDraft) ? 'not-allowed' : 'pointer',
-                  display: 'grid', placeItems: 'center', // Center the icon
-                  padding: 8, // Make it square
-                }}
-              >
-                {isAnalyzing ? '분석 중…' : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#4CAF50" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg>
-                )}
-              </button>
-
-              <div
-                onMouseEnter={onDownloadEnter}
-                onMouseLeave={onDownloadLeave}
-                style={{ position: 'relative' }}
-              >
-                <button
-                  className="btn"
-                  type="button"
-                  disabled={!activeDoc}
-                  style={{
-                    opacity: !activeDoc ? 0.6 : 1,
-                    cursor: !activeDoc ? 'not-allowed' : 'pointer',
-                    display: 'grid', placeItems: 'center', // Center the icon
-                    padding: 8, // Make it square
-                  }}
-                  title="내보내기"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                </button>
-                {isDownloadOpen && activeDoc && (
-                  <div
-                    className="card"
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 8px)',
-                      right: 0,
-                      minWidth: 180,
-                      padding: 8,
-                      border: '2px solid var(--border)',
-                      background: 'var(--bg-card)',
-                      zIndex: 50,
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.45)'
-                    }}
-                  >
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => { setIsDownloadOpen(false); exportAsTxt() }}
-                      style={{
-                        width: '100%',
-                        justifyContent: 'flex-start',
-                        textAlign: 'left',
-                        marginBottom: 6
-                      }}
-                    >
-                      txt로 내보내기
-                    </button>
-
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => { setIsDownloadOpen(false); exportAsDocx() }}
-                      style={{
-                        width: '100%',
-                        justifyContent: 'flex-start',
-                        textAlign: 'left'
-                      }}
-                    >
-                      docx로 내보내기
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                className="btn"
-                onClick={() => setIsRightPanelOpen(prev => !prev)}
-                title="보고서 패널 토글"
-                style={{ padding: 8, display: 'grid', placeItems: 'center' }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10 9 9 9 8 9" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {!user && <div style={{ fontSize: 10, color: '#ffab40' }}>* 전체 분석은 로그인 필요</div>}
-
           <div className="scroll-hide" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             {activeDoc ? (
               <Editor 
                 initialText={activeDoc.extracted_text} 
                 onSave={(newText) => {
-                  // TODO: 자동 저장 로직 구현 (API 연동 필요)
-                  console.log('Text updated:', newText.slice(0, 20) + '...')
+                  if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+                  saveTimeoutRef.current = setTimeout(async () => {
+                    try {
+                      const plainText = newText.replace(/<\/p><p>/g, '\n').replace(/<[^>]+>/g, '')
+                      await updateDocument(activeDocId, { extracted_text: plainText })
+                      setActiveDoc(prev => ({ ...prev, extracted_text: plainText }))
+                    } catch (err) {
+                      console.error('Auto-save failed:', err)
+                    }
+                  }, 1000)
                 }}
                 analysisResult={activeAnalysis?.result}
                 setTooltip={setTooltip}
+                onRunAnalysis={onRunAnalysis}
+                isAnalyzing={isAnalyzing}
+                onExportTxt={exportAsTxt}
+                onExportDocx={exportAsDocx}
+                onToggleRightPanel={() => setIsRightPanelOpen(prev => !prev)}
               />
             ) : (
               <div className="muted" style={{ padding: 20 }}>왼쪽에서 원고를 선택하거나 업로드하세요.</div>
             )}
           </div>
-
-          {/* Draft input - Only show when in upload mode */}
-          {leftMode === 'upload' && (
-            <div className="card" style={{ padding: 12, background: 'var(--bg-card)', border: '3px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div style={{ fontWeight: 700 }}>텍스트 입력</div>
-                <button
-                  className="btn"
-                  onClick={onSaveDraft}
-                  disabled={isSavingDraft || isUploading || isAnalyzing}
-                  style={{
-                    opacity: (isSavingDraft || isUploading || isAnalyzing) ? 0.7 : 1,
-                    cursor: (isSavingDraft || isUploading || isAnalyzing) ? 'not-allowed' : 'pointer',
-                  }}
-                  title={isSavingDraft ? '저장 중…' : '입력한 텍스트를 .txt로 저장'}
-                >
-                  {isSavingDraft ? '저장 중…' : '저장'}
-                </button>
-              </div>
-
-              <textarea
-                value={draftText}
-                onChange={(e) => setDraftText(e.target.value)}
-                placeholder="여기에 텍스트를 입력하고 [저장]을 누르면 .txt 원고로 저장됩니다."
-                className="mono"
-                style={{
-                  width: '96%',
-                  height: 140,
-                  resize: 'vertical',
-                  borderRadius: 8,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-panel)',
-                  color: 'var(--text-main)',
-                  padding: 10,
-                  outline: 'none',
-                  lineHeight: 1.5,
-                  fontSize: 12
-                }}
-              />
-              <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
-                저장 시 파일명은 자동으로 <span className="mono">draft_YYYYMMDD_HHMMSS.txt</span> 형태로 생성됩니다.
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Right panel */}

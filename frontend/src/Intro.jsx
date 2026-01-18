@@ -13,28 +13,30 @@ export default function Intro({ onFinish }) {
 
     let i = 0
     let j = 0
+    let timeoutId = null
     
-    // 첫 번째 줄 타이핑
-    const timer1 = setInterval(() => {
-      if (i < text1.length) {
-        setLine1(prev => prev + text1.charAt(i))
+    const typeLine1 = () => {
+      if (i <= text1.length) {
+        setLine1(text1.slice(0, i))
         i++
+        timeoutId = setTimeout(typeLine1, 50)
       } else {
-        clearInterval(timer1)
-        // 두 번째 줄 타이핑 시작
-        const timer2 = setInterval(() => {
-          if (j < text2.length) {
-            setLine2(prev => prev + text2.charAt(j))
-            j++
-          } else {
-            clearInterval(timer2)
-          }
-        }, 60)
+        timeoutId = setTimeout(typeLine2, 500) // 첫 줄 끝나고 약간의 휴식
       }
-    }, 60)
+    }
+
+    const typeLine2 = () => {
+      if (j <= text2.length) {
+        setLine2(text2.slice(0, j))
+        j++
+        timeoutId = setTimeout(typeLine2, 70)
+      }
+    }
+
+    timeoutId = setTimeout(typeLine1, 300) // 시작 전 약간의 대기
 
     return () => {
-      clearInterval(timer1)
+      if (timeoutId) clearTimeout(timeoutId)
     }
   }, [])
 
