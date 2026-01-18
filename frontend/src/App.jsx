@@ -8,6 +8,7 @@ import {
   listAnalysesByDoc,
   listDocuments,
   runAnalysis,
+  runAnalysisStream,
   uploadDocument
 } from './api.js'
 
@@ -446,6 +447,8 @@ export default function App() {
 
   const [analysisElapsedSec, setAnalysisElapsedSec] = useState(0)
   const analysisTimerRef = useRef(null)
+  const chatEndRef = useRef(null)
+  const chatContainerRef = useRef(null)
 
   const [draftText, setDraftText] = useState('')
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -562,6 +565,12 @@ export default function App() {
     }
   }, [isAnalyzing])
 
+  useEffect(() => {
+    if (rightView === 'chat' && chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [activeAnalysis?.result?.logs, rightView])
+
   async function uploadOneFile(file) {
     if (!file) return
     setIsUploading(true)
@@ -633,17 +642,79 @@ export default function App() {
     setIsAnalyzing(true); setError(null)
     setRightView('chat')
     setIsRightPanelOpen(true)
+    
+    // 초기 로그 상태 설정
+    const initialLog = { agent: '코디네이터', message: '저희가 왔어요! 전문가 친구들을 한 분씩 모셔오고 있으니 잠시만 기다려 주세요. 금방 시작할게요! ✨', timestamp: Date.now() / 1000 };
+    setActiveAnalysis({
+      result: {
+        logs: [initialLog]
+      }
+    })
 
     try {
-      const a = await runAnalysis(activeDocId, { personaCount, creativeFocus })
-      const full = await getAnalysis(a.id)
-      const list = await listAnalysesByDoc(activeDocId)
-      setAnalyses(list)
-      setActiveAnalysis(full)
-      setRightView('report')
-      pushToast('분석이 완료되었습니다.', 'success')
+      const stream = runAnalysisStream(activeDocId)
+      
+      let finalData = null
+      
+      for await (const event of stream) {
+        if (!event) continue;
+        console.log("Stream event:", event); // 디버깅용 로그
+
+
+        if (event.type === 'log') {
+          setActiveAnalysis(prev => {
+            const currentLogs = prev?.result?.logs || []
+            return {
+              ...prev,
+              result: {
+                ...(prev?.result || {}),
+                logs: [...currentLogs, ...(event.logs || [])]
+              }
+            }
+          })
+        } else if (event.type === 'node_complete') {
+          console.log(`Node complete: ${event.node}`)
+        } else if (event.type === 'final_result') {
+          finalData = event.data
+          if (!finalData) continue;
+
+          const list = await listAnalysesByDoc(activeDocId)
+          setAnalyses(list)
+          
+          setActiveAnalysis(prev => {
+            // 스트리밍 중 쌓인 로그와 최종 데이터의 로그를 병합
+            const streamLogs = prev?.result?.logs || []
+            const finalLogs = finalData.logs || [] // finalData는 순수 결과 객체임
+            
+            const combinedLogs = [...streamLogs]
+            finalLogs.forEach(fLog => {
+              if (!combinedLogs.find(sLog => sLog.message === fLog.message)) {
+                combinedLogs.push(fLog)
+              }
+            })
+
+            // UI가 기대하는 AnalysisDetail 구조로 변환
+            return {
+              id: event.analysis_id,
+              document_id: activeDocId,
+              status: 'done',
+              result: {
+                ...finalData,
+                logs: combinedLogs.sort((a, b) => a.timestamp - b.timestamp)
+              }
+            }
+          })
+          
+          setRightView('report')
+          // 분석 완료 시 좌측의 점수 요약 패널도 자동으로 펼침
+          setDocScoreOpenId(activeDocId)
+          pushToast('분석이 완료되었습니다.', 'success')
+        }
+      }
     } catch (e2) {
+      console.error('Analysis Stream Error:', e2)
       setError(String(e2))
+      pushToast('분석 중 오류가 발생했습니다.', 'error')
     } finally {
       setIsAnalyzing(false)
     }
@@ -1843,7 +1914,9 @@ function SettingsIcon({ size = 28 }) {
           className="card right-panel"
           style={{
             padding: 8,
-            overflow: isRightPanelOpen ? 'auto' : 'hidden',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
             opacity: isRightPanelOpen ? 1 : 0,
             transition: 'opacity 0.2s ease-in-out',
             border: '2px solid var(--border)',
@@ -1918,9 +1991,9 @@ function SettingsIcon({ size = 28 }) {
           )}
 
           {activeAnalysis && (
-            <div style={{ marginTop: 12 }}>
+            <div className="scroll-hide" style={{ marginTop: 12, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
               {rightView === 'report' && (
-                <>
+                <div style={{ paddingBottom: 20 }}>
                   {reportMarkdown ? (
                     <div className="card" style={{ padding: 16, background: 'var(--bg-card)', marginBottom: 12 }}>
                       <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.6 }}>
@@ -1935,7 +2008,7 @@ function SettingsIcon({ size = 28 }) {
                       </div>
                     </div>
                   )}
-                </>
+                </div>
               )}
 
               {rightView === 'json' && (
@@ -1948,59 +2021,77 @@ function SettingsIcon({ size = 28 }) {
               )}
 
               {rightView === 'chat' && (
-                <div className="card" style={{ padding: 12 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 12, borderBottom: '1px solid #444', paddingBottom: 8 }}>
-                    🤖 에이전트 작업 로그 (Agent Chat)
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                    <span>🤖 에이전트 작업 로그 (Agent Chat)</span>
+                    <Badge>{activeAnalysis?.result?.logs?.length || 0} 메시지</Badge>
                   </div>
-                  {/* TODO: Connect to real-time agent logs from backend */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ 
-                      alignSelf: 'flex-start', 
-                      background: 'var(--bg-sidebar)', 
-                      padding: '8px 12px', 
-                      borderRadius: '12px 12px 12px 0', 
-                      maxWidth: '85%', 
-                      fontSize: 13,
-                      border: '1px solid var(--border)'
-                    }}>
-                      <strong>System</strong>: 분석 파이프라인을 가동합니다.
-                    </div>
-                    <div style={{ 
-                      alignSelf: 'flex-end', 
-                      background: 'var(--bg-card)', 
-                      padding: '8px 12px', 
-                      borderRadius: '12px 12px 0 12px', 
-                      maxWidth: '85%', 
-                      fontSize: 13,
-                      border: '1px solid var(--border)'
-                    }}>
-                      <strong>SummaryAgent</strong>: 원고 전체 요약을 시작합니다...
-                    </div>
-                    <div style={{ 
-                      alignSelf: 'flex-start', 
-                      background: 'var(--bg-sidebar)', 
-                      padding: '8px 12px', 
-                      borderRadius: '12px 12px 12px 0', 
-                      maxWidth: '85%', 
-                      fontSize: 13,
-                      border: '1px solid var(--border)'
-                    }}>
-                      <strong>ToneAgent</strong>: 문체 분석을 위해 텍스트 청크를 수신했습니다.
-                    </div>
-                    <div style={{ 
-                      alignSelf: 'flex-start', 
-                      background: 'var(--bg-sidebar)', 
-                      padding: '8px 12px', 
-                      borderRadius: '12px 12px 12px 0', 
-                      maxWidth: '85%', 
-                      fontSize: 13,
-                      border: '1px solid var(--border)'
-                    }}>
-                      <strong>SafetyGuard</strong>: 트라우마/혐오 표현 검사 완료. (Found: 0)
-                    </div>
-                     <div className="muted" style={{ fontSize: 12, textAlign: 'center', marginTop: 10 }}>
-                      ... 실시간 로그 연동 준비 중 ...
-                    </div>
+                  
+                  <div 
+                    ref={chatContainerRef}
+                    className="scroll-hide" 
+                    style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 20 }}
+                  >
+                    {activeAnalysis?.result?.logs && activeAnalysis.result.logs.length > 0 ? (
+                      activeAnalysis.result.logs.map((log, i) => {
+                        const isCoordinator = log.agent === 'System' || log.agent === 'Coordinator' || log.agent === 'Chief Editor';
+                        
+                        // 에이전트 이름별 ISSUE_COLORS 키 매핑
+                        const agentMapping = {
+                          '서사 분석가': 'logic',
+                          '맞춤법 전문가': 'spelling',
+                          '문체 전문가': 'tone',
+                          '장르 전문가': 'genre_cliche',
+                          '안전 관리자': 'trauma',
+                          '윤리 감시자': 'hate_bias',
+                          '긴장감 설계자': 'tension',
+                          '코디네이터': 'tension', // 시스템 코디네이터는 기본적으로 연두색 계열
+                          '수석 편집자': 'default'
+                        };
+                        
+                        const agentKey = agentMapping[log.agent] || 'default';
+                        const color = ISSUE_COLORS[agentKey] || ISSUE_COLORS.default;
+                        
+                        return (
+                          <div key={i} style={{ 
+                            alignSelf: 'flex-start',
+                            maxWidth: '90%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, marginLeft: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ 
+                                width: 8, 
+                                height: 8, 
+                                borderRadius: '50%', 
+                                background: color 
+                              }} />
+                              {log.agent}
+                              <span className="muted" style={{ fontWeight: 400 }}>
+                                {log.timestamp ? new Date(log.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                            <div style={{ 
+                              background: isCoordinator ? 'rgba(139, 195, 74, 0.05)' : 'var(--bg-panel)',
+                              padding: '10px 14px',
+                              borderRadius: '14px 14px 14px 4px',
+                              fontSize: 13,
+                              lineHeight: 1.5,
+                              border: `2px solid ${color}`,
+                              color: 'var(--text-main)'
+                            }}>
+                              {log.message}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="muted" style={{ textAlign: 'center', marginTop: 40 }}>
+                        {isAnalyzing ? '분석이 진행 중입니다. 잠시만 기다려 주세요...' : '로그 데이터가 없습니다.'}
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
                   </div>
                 </div>
               )}

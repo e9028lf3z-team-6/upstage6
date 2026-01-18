@@ -78,7 +78,34 @@ export async function getMe() {
   return request('/auth/me');
 }
 
-export function logout() {
-  localStorage.removeItem('token');
-  window.location.href = '/';
+export async function* runAnalysisStream(docId) {
+  const url = `${API_BASE}/analysis/run-stream/${docId}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // 마지막 미완성 라인은 다시 버퍼에 저장
+
+    for (const line of lines) {
+      if (line.trim()) {
+        yield JSON.parse(line);
+      }
+    }
+  }
 }
+

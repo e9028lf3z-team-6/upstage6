@@ -1,5 +1,6 @@
-from typing import Any, Dict, Optional
 import logging
+import time
+from typing import Any, Dict, Optional
 
 from app.core.settings import get_settings
 from app.graph.graph import agent_app
@@ -53,21 +54,133 @@ async def run_analysis_for_text(
     context: Optional[str] = None,
     mode: str = "full",
 ) -> Dict[str, Any]:
-    """
-    전체 분석 파이프라인 실행
-    - UPSTAGE_API_KEY 있으면 LangGraph + LLM
-    - 없으면 로컬 휴리스틱 fallback
-    - 항상 동일한 출력 스키마 반환
-    """
-    logger.info(f"[DEBUG] run_analysis_for_text started. Text len: {len(text)}, Mode: {mode}")
-
+    # ... (기존 코드 유지)
     if has_upstage_api_key():
         if mode == "full":
             return await _run_langgraph_full(text=text, context=context, mode=mode)
         return _run_causality_only(text=text, mode=mode)
-    
-    logger.info("[DEBUG] No UPSTAGE_API_KEY found. Running fallback.")
-    return _run_fallback(text=text, mode=mode)
+    # ...
+
+async def stream_analysis_for_text(
+    text: str,
+    context: Optional[str] = None,
+    mode: str = "full",
+):
+    """
+    분석 과정을 실시간으로 스트리밍하는 비동기 제너레이터
+    """
+    logger.info(f"[STREAM] Start streaming. Mode: {mode}, API_KEY: {has_upstage_api_key()}")
+
+    if not has_upstage_api_key() or mode != "full":
+        logger.info(f"[STREAM] Entering non-full/fallback mode. Mode: {mode}")
+        # 폴백이나 제한 모드일 경우 즉시 결과 반환
+        yield {"type": "log", "agent": "코디네이터", "logs": [{"agent": "코디네이터", "message": "작가님, 제가 가벼운 마음으로 먼저 훑어볼게요! 상세 분석은 로그인이 필요하지만, 기본적인 것부터 도와드릴게요.", "timestamp": time.time()}]}
+        
+        logger.info(f"[STREAM] Running run_analysis_for_text for mode: {mode}")
+        res = await run_analysis_for_text(text, context, mode)
+        logger.info(f"[STREAM] run_analysis_for_text completed.")
+        
+        yield {"type": "final_result", "data": res}
+        return
+
+    initial_state: AgentState = {
+        "original_text": text,
+        "context": context,
+        "logs": []
+    }
+
+    # 누적된 최종 상태를 담을 변수
+    accumulated_state = initial_state.copy()
+
+    # 노드 이름 매핑 (가독성용)
+    node_labels = {
+        "reader_persona": "독자 페르소나 설정",
+        "split": "문장 분리 중",
+        "summary": "전체 맥락 요약",
+        "persona_feedback": "페르소나 맞춤 피드백",
+        "tone": "말투/어조 분석",
+        "logic": "개연성/논리 분석",
+        "trauma": "트라우마 유발 요소 검사",
+        "hate_bias": "혐오/편향 표현 검사",
+        "genre_cliche": "장르 클리셰 분석",
+        "spelling": "맞춤법 검사",
+        "tension_curve": "긴장도 곡선 생성",
+        "aggregate": "분석 결과 종합",
+        "report": "최종 리포트 작성",
+        "qa_scores": "품질 점수 산정"
+    }
+
+    try:
+        async for event in agent_app.astream(initial_state, stream_mode="updates"):
+            for node_name, state_update in event.items():
+                try:
+                    # 상태 누적
+                    accumulated_state.update(state_update)
+                    
+                    label = node_labels.get(node_name, node_name)
+                    
+                    # 1. 노드에서 발생한 실제 로그 전송
+                    if "logs" in state_update and state_update["logs"]:
+                        yield {"type": "log", "agent": node_name, "logs": state_update["logs"]}
+                    else:
+                        # 2. 로그가 없는 노드일 경우 단순 진행 상황 알림
+                        yield {"type": "log", "agent": "코디네이터", "logs": [{"agent": "코디네이터", "message": f"'{label}' 단계를 끝냈어요!", "timestamp": time.time()}]}
+                    
+                    yield {"type": "node_complete", "node": node_name}
+                except Exception as node_err:
+                    logger.error(f"[STREAM] Node update error ({node_name}): {node_err}")
+
+        # 최종 결과 구성
+        res = await _build_final_result(accumulated_state, text, context, mode)
+        yield {"type": "final_result", "data": res}
+        
+    except Exception as e:
+        logger.error(f"[STREAM] Critical Error: {e}", exc_info=True)
+        yield {"type": "error", "message": str(e)}
+
+async def _build_final_result(final_state: AgentState, text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
+    """최종 상태를 분석 결과 딕셔너리로 변환 (ainvoke 없이)"""
+    aggregated = final_state.get("aggregated_result") or {}
+    decision = aggregated.get("decision")
+    final_report = final_state.get("final_report")
+    logic = final_state.get("logic_result") or final_state.get("causality_result")
+    tension = final_state.get("tension_curve_result")
+
+    split_payload = final_state.get("split_text") or {}
+    if isinstance(split_payload, list):
+        split_payload = {"split_sentences": [str(item) for item in split_payload], "split_map": []}
+    elif isinstance(split_payload, str):
+        split_payload = build_split_payload(split_payload)
+    elif not isinstance(split_payload, dict):
+        split_payload = {}
+
+    result = {
+        "split": split_payload,
+        "final_report": final_report,
+        "report": final_report,
+        "decision": decision,
+        "tone": final_state.get("tone_result"),
+        "logic": logic,
+        "trauma": final_state.get("trauma_result"),
+        "hate_bias": final_state.get("hate_bias_result"),
+        "genre_cliche": final_state.get("genre_cliche_result"),
+        "spelling": final_state.get("spelling_result"),
+        "tension_curve": tension,
+        "causality": logic,
+        "aggregate": aggregated,
+        "aggregated": aggregated,
+        "reader_persona": final_state.get("reader_persona"),
+        "persona_feedback": final_state.get("persona_feedback"),
+        "rewrite_guidelines": final_state.get("rewrite_guidelines"),
+        "logs": final_state.get("logs", []),
+        "debug": {"mode": f"langgraph_stream_{mode}"},
+    }
+
+    result["final_metric"] = final_state.get("final_metric") or _run_final_evaluator(result)
+    result["qa_scores"] = final_state.get("qa_scores") or _run_qa_scores(text, result, mode="full")
+    _apply_optional_outputs(result, split_payload)
+
+    return result
 
 
 def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) -> None:
@@ -134,6 +247,7 @@ async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> D
         "reader_persona": final_state.get("reader_persona"),
         "persona_feedback": final_state.get("persona_feedback"),
         "rewrite_guidelines": final_state.get("rewrite_guidelines"),
+        "logs": final_state.get("logs", []),
         "debug": {"mode": f"langgraph_{mode}"},
     }
 
@@ -201,6 +315,7 @@ def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
         "hate_bias": {"issues": []},
         "genre_cliche": {"issues": []},
         "spelling": {"issues": []},
+        "tension_curve": {"curve": []},
         "aggregate": aggregate.dict() if hasattr(aggregate, "dict") else aggregate,
         "aggregated": aggregate.dict() if hasattr(aggregate, "dict") else aggregate,
         "final_metric": {},
