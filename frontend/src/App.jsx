@@ -503,7 +503,7 @@ export default function App() {
   }, [theme])
 
   async function onLogin() {
-    window.location.href = 'http://localhost:8000/api/auth/login'
+    window.location.href = '/api/auth/login'
   }
 
   async function onLogout() {
