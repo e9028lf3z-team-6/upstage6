@@ -27,7 +27,9 @@ def create_app() -> FastAPI:
     
     app.add_middleware(
         SessionMiddleware,
-        secret_key=settings.secret_key
+        secret_key=settings.secret_key,
+        https_only=True,
+        same_site="lax"
     )
     
     app.add_middleware(
