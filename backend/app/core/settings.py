@@ -2,7 +2,12 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        extra="ignore",
+        env_prefix="",
+        case_sensitive=False
+    )
 
     frontend_origin: str = "http://localhost:5173"
     db_url: str = "sqlite+aiosqlite:///./data/team.db"
