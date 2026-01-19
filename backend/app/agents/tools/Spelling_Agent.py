@@ -57,13 +57,16 @@ class SpellingAgent(BaseAgent):
 
     def _analyze_chunk(self, chunk: list[str], start_index: int) -> dict:
         system = """
-너는 창작물 교정 보조 시스템이다. 문학적 허용과 구어체를 존중하며, 명백한 오류만 찾아내야 한다.
+너는 창작물 교정 보조 시스템이다.
 반드시 JSON만 출력한다.
 """
-        split_context = json.dumps(chunk, ensure_ascii=False)
+        import json
+        # ID를 명시적으로 부여 (0부터 시작하는 상대값)
+        indexed_chunk = [{"id": i, "text": sent} for i, sent in enumerate(chunk)]
+        split_context = json.dumps(indexed_chunk, ensure_ascii=False)
+
         prompt = f"""
-입력은 원고의 문장 배열(JSON)이다. 시작 인덱스는 {start_index}이다.
-각 문장의 sentence_index는 {start_index} + (배열 인덱스)이다.
+입력은 원고의 문장 배열(JSON)이다. 각 객체는 "id"와 "text"를 가진다.
 
 [분석 지침]
 1. **탐지 대상**:
@@ -71,16 +74,11 @@ class SpellingAgent(BaseAgent):
    - 문맥상 명확히 틀린 조사 (예: '밥을 먹다' -> '밥이 먹다')
    - 심각한 띄어쓰기 오류 (의미 전달을 해칠 정도)
 
-2. **무시할 대상 (Detection Exclusion)**:
-   - 대화문(" ") 내부의 구어체, 비속어, 사투리
-   - 의도적인 문법 파괴나 시적 허용
-   - 인터넷 용어, 신조어, 의성어/의태어
-   - 문장의 종결이 명사형으로 끝나는 경우 (개조식 문체)
+2. **무시할 대상**:
+   - 대화문, 사투리, 시적 허용, 인터넷 용어
 
 3. **목표**:
-   - 과도한 지적을 지양하고, 작가가 실수한 것으로 보이는 부분만 집어낼 것.
-   - 애매하면 지적하지 말 것.
-   - 해당 청크의 맞춤법 정확도를 0~100점 점수로 평가할 것. (오류가 없으면 100점)
+   - 과도한 지적 지양. 명백한 실수만 지적.
 
 출력 형식(JSON):
 {{
@@ -89,13 +87,13 @@ class SpellingAgent(BaseAgent):
     {{
       "issue_type": "spelling | spacing | particle",
       "severity": "low | medium | high",
-      "sentence_index": <int: {start_index} + relative_index>,
+      "ref_id": <int: 입력 객체의 "id" 값을 그대로 복사>,
       "char_start": 0,
       "char_end": 0,
       "quote": "오류가 있는 단어 또는 어절",
       "reason": "오류라고 판단한 명확한 이유",
       "suggestion": "수정 제안 (선택)",
-      "confidence": 0.8  // 0.0 ~ 1.0 (0.8 이상인 것만 출력 권장)
+      "confidence": 0.8
     }}
   ]
 }}
@@ -104,4 +102,17 @@ class SpellingAgent(BaseAgent):
 {split_context}
 """
         response = chat(prompt, system=system)
-        return self._safe_json_load(response)
+        result = self._safe_json_load(response)
+        
+        # Post-processing: Map ref_id back to absolute sentence_index
+        if "issues" in result and isinstance(result["issues"], list):
+            for issue in result["issues"]:
+                # ref_id를 확인하고 sentence_index로 변환
+                ref_id = issue.pop("ref_id", None) # ref_id는 제거하고 sentence_index로 변경
+                if ref_id is not None and isinstance(ref_id, int):
+                    issue["sentence_index"] = start_index + ref_id
+                elif "sentence_index" in issue and isinstance(issue["sentence_index"], int):
+                    # 혹시 LLM이 습관적으로 sentence_index를 썼을 경우 대비 (상대 인덱스로 가정)
+                    issue["sentence_index"] = start_index + issue["sentence_index"]
+                    
+        return result

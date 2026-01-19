@@ -60,26 +60,26 @@ class HateBiasAgent(BaseAgent):
 You are a strict JSON generator. You MUST output valid JSON only.
 """
         import json
-        split_context = json.dumps(chunk, ensure_ascii=False)
+        # ID를 명시적으로 부여
+        indexed_chunk = [{"id": i, "text": sent} for i, sent in enumerate(chunk)]
+        split_context = json.dumps(indexed_chunk, ensure_ascii=False)
 
         prompt = f"""
 너는 '혐오 및 편견 표현 탐지기'이다.
-입력은 원고의 문장 배열(JSON)이며, 시작 인덱스는 {start_index}이다.
-각 이슈의 sentence_index는 {start_index} + (청크 내 인덱스)로 계산해야 한다.
+입력은 원고의 문장 배열(JSON)이며, 각 객체는 "id"와 "text"를 가진다.
 
 핵심 원칙:
 - 반드시 '집단적 속성'과 연결된 경우만 issue로 판단할 것
 - 모든 설명(reason, target, bias_type)은 반드시 한국어로 작성하라.
-- 탐지 대상: 특정 집단 일반화, 성별/민족/직업 등 고정관념, 비하
 
 출력 JSON 형식:
 {{
-  "score": <int 0-100, 혐오/편견 없는 청정 윤리 점수>,
+  "score": <int 0-100>,
   "issues": [
     {{
       "issue_type": "bias | hate | stereotype",
       "severity": "low | medium | high",
-      "sentence_index": <int: {start_index} + relative_index>,
+      "ref_id": <int: 입력 객체의 "id" 값을 그대로 복사>,
       "char_start": 0,
       "char_end": 0,
       "quote": "문제 구간 원문 인용",
@@ -95,4 +95,15 @@ You are a strict JSON generator. You MUST output valid JSON only.
 {split_context}
 """
         response = chat(prompt, system=system)
-        return self._safe_json_load(response)
+        result = self._safe_json_load(response)
+
+        # Post-processing
+        if "issues" in result and isinstance(result["issues"], list):
+            for issue in result["issues"]:
+                ref_id = issue.pop("ref_id", None)
+                if ref_id is not None and isinstance(ref_id, int):
+                    issue["sentence_index"] = start_index + ref_id
+                elif "sentence_index" in issue and isinstance(issue["sentence_index"], int):
+                    issue["sentence_index"] = start_index + issue["sentence_index"]
+        
+        return result

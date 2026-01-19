@@ -60,17 +60,16 @@ class TraumaAgent(BaseAgent):
 You are a strict JSON generator. You MUST output valid JSON only.
 """
         import json
-        split_context = json.dumps(chunk, ensure_ascii=False)
+        indexed_chunk = [{"id": i, "text": sent} for i, sent in enumerate(chunk)]
+        split_context = json.dumps(indexed_chunk, ensure_ascii=False)
 
         prompt = f"""
 너는 '트라우마 위험 표현 탐지기'이다.
-입력은 문장 배열(JSON)이며, 시작 인덱스는 {start_index}이다.
-각 이슈의 sentence_index는 {start_index} + (청크 내 인덱스)여야 한다.
+입력은 문장 배열(JSON)이며, 각 객체는 "id"와 "text"를 가진다.
 
 목표:
 1. 독자에게 심리적 충격, 불안, 트라우마를 유발할 가능성이 있는 표현(재난, 폭력, 위험행동 등) 식별
 2. 모든 설명(reason, trigger_type)은 반드시 한국어로 작성하라.
-3. 해당 청크의 안전성(트라우마 요소 부재)을 0~100점 점수로 평가할 것. (트라우마 요소가 없으면 100점)
 
 출력 JSON 형식:
 {{
@@ -79,7 +78,7 @@ You are a strict JSON generator. You MUST output valid JSON only.
     {{
       "issue_type": "trauma_trigger",
       "severity": "low | medium | high",
-      "sentence_index": <int: {start_index} + relative_index>,
+      "ref_id": <int: 입력 객체의 "id" 값을 그대로 복사>,
       "char_start": 0,
       "char_end": 0,
       "quote": "문제 구간 원문 인용",
@@ -94,4 +93,15 @@ You are a strict JSON generator. You MUST output valid JSON only.
 {split_context}
 """
         response = chat(prompt, system=system)
-        return self._safe_json_load(response)
+        result = self._safe_json_load(response)
+
+        # Post-processing
+        if "issues" in result and isinstance(result["issues"], list):
+            for issue in result["issues"]:
+                ref_id = issue.pop("ref_id", None)
+                if ref_id is not None and isinstance(ref_id, int):
+                    issue["sentence_index"] = start_index + ref_id
+                elif "sentence_index" in issue and isinstance(issue["sentence_index"], int):
+                    issue["sentence_index"] = start_index + issue["sentence_index"]
+        
+        return result
