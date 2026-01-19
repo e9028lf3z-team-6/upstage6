@@ -582,8 +582,6 @@ export default function App() {
 
       if (fileRef.current) fileRef.current.value = ''
       if (uploaderFileRef.current) uploaderFileRef.current.value = ''
-
-      pushToast('업로드가 완료되었습니다.', 'success')
     } catch (e2) {
       setError(String(e2))
     } finally {
@@ -1869,7 +1867,7 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
               width: 'min(380px, 94vw)',
               padding: 16,
               border: '2px solid var(--border)',
-              background: 'var(--bg-panel)',
+              background: '#fff',
               boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
             }}
           >
