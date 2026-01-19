@@ -301,9 +301,6 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button className="btn" onClick={onRunAnalysis} disabled={isAnalyzing} style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', background: 'transparent' }} title="분석 실행">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="#4CAF50" stroke="#4CAF50" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </button>
             <div style={{ position: 'relative' }} onMouseEnter={() => setIsExportOpen(true)} onMouseLeave={() => setIsExportOpen(false)}>
               <button className="btn" style={{ padding: '4px 8px', background: 'transparent' }} title="내보내기">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -512,7 +509,7 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
                       width: '100%', height: '100%', background: 'linear-gradient(90deg, #4CAF50, #81C784)', animation: 'moving-gradient 2s infinite linear' 
                     }} />
                   </div>
-                  <p style={{ marginTop: '16px', fontSize: '13px', color: '#4CAF50', fontWeight: 700 }}>AI 협업 분석 진행 중... (약 10-20초 소요)</p>
+                  <p style={{ marginTop: '16px', fontSize: '13px', color: '#4CAF50', fontWeight: 700 }}>AI 협업 분석 진행 중...</p>
                 </div>
               )}
               

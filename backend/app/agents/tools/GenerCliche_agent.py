@@ -69,6 +69,7 @@ Do NOT include explanations or markdown.
 
         주의 사항:
         - 클리셰 자체가 나쁜 것은 아니나, 독자에게 지루함을 줄 수 있는 경우 'issue'로 식별
+        - 모든 설명(reason, genre, pattern)은 반드시 한국어로 작성하라.
         - 수정 제안 금지
         - 오직 독자 인식 관점에서의 '전형성 가능성'만 기술
 
@@ -83,9 +84,9 @@ Do NOT include explanations or markdown.
               "char_start": 0,
               "char_end": 0,
               "quote": "문제 구간 원문 인용",
-              "reason": "왜 독자에게 익숙한 클리셰로 인식될 수 있는지 설명",
-              "genre": "추정 장르 (예: 성장, 드라마, 액션 등)",
-              "pattern": "전형적으로 반복되는 서사 패턴 요약",
+              "reason": "왜 독자에게 익숙한 클리셰로 인식될 수 있는지 한국어로 설명",
+              "genre": "추정 장르 (예: 성장, 드라마, 액션 등) - 한국어로 작성",
+              "pattern": "전형적으로 반복되는 서사 패턴 요약 - 한국어로 작성",
               "confidence": 0.0
             }}
           ],

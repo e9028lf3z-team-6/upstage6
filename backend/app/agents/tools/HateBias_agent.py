@@ -69,6 +69,7 @@ You are a strict JSON generator. You MUST output valid JSON only.
 
 핵심 원칙:
 - 반드시 '집단적 속성'과 연결된 경우만 issue로 판단할 것
+- 모든 설명(reason, target, bias_type)은 반드시 한국어로 작성하라.
 - 탐지 대상: 특정 집단 일반화, 성별/민족/직업 등 고정관념, 비하
 
 출력 JSON 형식:
@@ -82,8 +83,8 @@ You are a strict JSON generator. You MUST output valid JSON only.
       "char_start": 0,
       "char_end": 0,
       "quote": "문제 구간 원문 인용",
-      "reason": "사유",
-      "target": "집단/대상",
+      "reason": "사유 (한국어로 작성)",
+      "target": "집단/대상 (한국어로 작성)",
       "bias_type": "혐오 | 편견 | 비하 | 고정관념",
       "confidence": 0.0
     }}

@@ -69,7 +69,8 @@ You are a strict JSON generator. You MUST output valid JSON only.
 
 목표:
 1. 독자에게 심리적 충격, 불안, 트라우마를 유발할 가능성이 있는 표현(재난, 폭력, 위험행동 등) 식별
-2. 해당 청크의 안전성(트라우마 요소 부재)을 0~100점 점수로 평가할 것. (트라우마 요소가 없으면 100점)
+2. 모든 설명(reason, trigger_type)은 반드시 한국어로 작성하라.
+3. 해당 청크의 안전성(트라우마 요소 부재)을 0~100점 점수로 평가할 것. (트라우마 요소가 없으면 100점)
 
 출력 JSON 형식:
 {{
@@ -82,7 +83,7 @@ You are a strict JSON generator. You MUST output valid JSON only.
       "char_start": 0,
       "char_end": 0,
       "quote": "문제 구간 원문 인용",
-      "reason": "사유",
+      "reason": "사유 (한국어로 작성)",
       "trigger_type": "사고 | 위험행동 | 재난 | 생명위협 | 공포묘사",
       "confidence": 0.0
     }}

@@ -59,16 +59,17 @@ Do NOT include explanations or markdown.
         지시사항:
         1. 독자 관점에서 긴장감(몰입감)이 떨어지거나 구조적으로 이상한 구간을 식별하라.
         2. 글 전체의 긴장감 조절 및 몰입도를 0~100점 사이의 점수('score')로 평가하라.
-        3. 수정 제안 금지
+        3. 모든 설명(reason, stage, issue, description)은 반드시 한국어로 작성하라.
+        4. 수정 제안 금지
 
         출력 JSON 형식:
         {{
           "score": <int 0-100, 독자가 느끼는 긴장감 및 몰입도 점수>,
           "curve": [
             {{
-              "stage": "사건 흐름 단계 또는 섹션",
+              "stage": "사건 흐름 단계 또는 섹션 (한국어로 작성)",
               "tension": "increase | maintain | decrease",
-              "reason": "독자 관점에서 그렇게 판단한 간단한 이유"
+              "reason": "독자 관점에서 그렇게 판단한 간단한 이유 (한국어로 작성)"
             }}
           ],
           "issues": [
@@ -79,7 +80,7 @@ Do NOT include explanations or markdown.
               "char_start": 0,
               "char_end": 0,
               "quote": "문제 구간 원문 인용",
-              "reason": "서사 구조 관점에서의 문제 설명",
+              "reason": "서사 구조 관점에서의 문제 설명 (한국어로 작성)",
               "confidence": 0.0
             }}
           ],
@@ -87,7 +88,7 @@ Do NOT include explanations or markdown.
             {{
               "location": "문제 구간",
               "issue": "긴장 급락 | 클라이맥스 부재 | 긴장 과도 | 반복 정체",
-              "description": "서사 구조 관점에서의 문제 설명"
+              "description": "서사 구조 관점에서의 문제 설명 (한국어로 작성)"
             }}
           ]
         }}
