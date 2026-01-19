@@ -432,10 +432,6 @@ export default function App() {
   const [personaCount, setPersonaCount] = useState(3)
   const [creativeFocus, setCreativeFocus] = useState(true)
   const [topic, setTopic] = useState('소설')
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('theme')
-    return saved === 'light' ? 'light' : 'dark'
-  })
 
   const [toasts, setToasts] = useState([])
   const [tooltip, setTooltip] = useState({ visible: false, content: null, x: 0, y: 0, borderColor: null })
@@ -500,11 +496,7 @@ export default function App() {
     }
   }, [])
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    // document.documentElement.style.colorScheme = theme
-    localStorage.setItem('theme', theme)
-  }, [theme])
+
 
   async function onLogin() {
     window.location.href = 'http://localhost:8000/api/auth/login'
@@ -889,12 +881,6 @@ export default function App() {
     setError(null)
   }
 
-  function openSettingsPanel() {
-    setLeftMode(prev => (prev === 'settings' ? 'list' : 'settings'))
-    setIsDragOver(false)
-    setError(null)
-  }
-
   function closeLeftPanelToList() {
     if (isUploading) return
     setLeftMode('list')
@@ -931,20 +917,7 @@ export default function App() {
     await uploadOneFile(file)
   }
 
-function SettingsIcon({ size = 28 }) {
-  return (
 
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M19.4 13.5a7.5 7.5 0 0 0 0-3l2-1.55-2-3.46-2.36.98a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.44 2.97a7.6 7.6 0 0 0-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 0 0 0 3l-2 1.55 2 3.46 2.36-.98a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.44-2.97a7.6 7.6 0 0 0 2.6-1.5l2.36.98 2-3.46-2-1.55Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 
   // toggle sizes
@@ -1371,85 +1344,10 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
               </div>
             )}
 
-            {/* Settings panel - Popover style */}
-            {leftMode === 'settings' && (
-              <div
-                className="card"
-                style={{
-                  position: 'absolute',
-                  bottom: 70, // Account bar height + margin
-                  left: 12,
-                  right: 12,
-                  zIndex: 100,
-                  padding: 14,
-                  minHeight: 200,
-                  border: '3px solid var(--border)',
-                  background: 'var(--bg-panel)',
-                  boxShadow: '0 -4px 20px rgba(0,0,0,0.2)',
-                  animation: 'slideUp 0.2s ease-out'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                   <div style={{ fontWeight: 800, fontSize: 16 }}>설정</div>
-                   <button onClick={() => setLeftMode('list')} className="btn" style={{ padding: '4px 8px', fontSize: 12 }}>닫기</button>
-                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 16 }}>테마</div>
-                      <div className="muted" style={{ fontSize: 12 }}>Light / Dark</div>
-                    </div>
 
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
-                      aria-pressed={theme === 'light'}
-                      style={{
-                        minWidth: 150,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 10,
-                        padding: '6px 10px'
-                      }}
-                    >
-                      <span style={{ fontSize: 12, fontWeight: 800 }}>
-                        {theme === 'light' ? 'Light' : 'Dark'}
-                      </span>
-
-                      <span aria-hidden="true" style={{
-                        width: SWITCH_W,
-                        height: SWITCH_H,
-                        borderRadius: 999,
-                        background: theme === 'light' ? '#66bb6a' : '#555',
-                        position: 'relative',
-                        display: 'inline-block',
-                        padding: SWITCH_PAD,
-                        boxSizing: 'border-box',
-                        transition: 'background 0.18s ease',
-                        border: '1px solid #2a2a2c'
-                      }}>
-                        <span style={{
-                          width: KNOB,
-                          height: KNOB,
-                          borderRadius: '50%',
-                          background: '#0f0f12',
-                          display: 'block',
-                          transform: theme === 'light' ? `translateX(${KNOB_TRAVEL}px)` : 'translateX(0px)',
-                          transition: 'transform 0.18s ease',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.45)'
-                        }} />
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* List panel - Always visible if list or settings (behind settings) */}
-            {(leftMode === 'list' || leftMode === 'settings') && (
+            {/* List panel - Always visible if list */}
+            {(leftMode === 'list') && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div className="muted" style={{ fontSize: 12 }}>원고 목록</div>
@@ -1719,27 +1617,7 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
                                       </svg>
                                     </button>
                   
-                                                                          <button
-                                                                            className="btn"
-                                                                            type="button"
-                                                                            onClick={openSettingsPanel}
-                                                                            title="Settings"
-                                                                            aria-label="Settings"
-                                                                            aria-pressed={leftMode === 'settings'}
-                                                                            style={{
-                                                                              width: 38,
-                                                                              height: 38,
-                                                                              display: 'flex',
-                                                                              justifyContent: 'center',
-                                                                              alignItems: 'center',
-                                                                              padding: 0,
-                                                                              background: theme === 'light' ? '#fff' : '#27272a',
-                                                                              color: theme === 'light' ? '#000' : '#fff',
-                                                                              border: theme === 'light' ? '2px solid #000' : '2px solid #fff'
-                                                                            }}
-                                                                          >                                                                                                    <SettingsIcon size={32} />
 
-                                                                                                  </button>
                 </div>
               )}
             </div>
