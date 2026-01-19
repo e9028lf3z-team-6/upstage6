@@ -414,7 +414,7 @@ const PERSONA_LEGEND = [
 ]
 
 export default function App() {
-  const [showIntro, setShowIntro] = useState(true)
+  const [showIntro, setShowIntro] = useState(() => !sessionStorage.getItem('intro_shown'))
   const [user, setUser] = useState(null)
 
   const [docs, setDocs] = useState([])
@@ -1040,7 +1040,10 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
 
   return (
     <>
-      {showIntro && <Intro onFinish={() => setShowIntro(false)} />}
+      {showIntro && <Intro onFinish={() => {
+        sessionStorage.setItem('intro_shown', 'true')
+        setShowIntro(false)
+      }} />}
       <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} borderColor={tooltip.borderColor} />
       <style>{`
         html, body {
@@ -1177,6 +1180,10 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
         @keyframes slideUp {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
       <div className="scroll-hide main-layout" style={{
@@ -1349,21 +1356,24 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div className="muted" style={{ fontSize: 12 }}>원고 목록</div>
-                  <button 
-                    onClick={onCreateNewDoc}
-                    className="btn"
-                    style={{ 
-                      padding: '2px 8px', 
-                      fontSize: 18, 
-                      fontWeight: 800, 
-                      lineHeight: 1,
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)'
-                    }}
-                    title="새 원고 생성"
-                  >
-                    +
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>새 원고</span>
+                    <button 
+                      onClick={onCreateNewDoc}
+                      className="btn"
+                      style={{ 
+                        padding: '2px 8px', 
+                        fontSize: 18, 
+                        fontWeight: 800, 
+                        lineHeight: 1,
+                        background: 'var(--bg-card)',
+                        border: '2px solid var(--border)'
+                      }}
+                      title="새 원고 생성"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
                 {docs.map(d => (
                   <div key={d.id} style={{ marginBottom: 12 }}>
@@ -1392,7 +1402,7 @@ ${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
                     </div>
 
                     {docScoreOpenId === d.id && (
-                      <div className="card" style={{ marginTop: 8, padding: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                      <div className="card" style={{ marginTop: 8, padding: 10, border: '2px solid black', background: 'var(--bg-card)', animation: 'slideDown 0.25s ease-out' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)' }}>
                             문서 점수 요약
