@@ -89,7 +89,7 @@ function TabButton({ label, active, onClick, icon }) {
   )
 }
 
-export default function Editor({ initialText, onSave, analysisResult, setTooltip, onRunAnalysis, isAnalyzing, onExportTxt, onExportDocx, onToggleRightPanel }) {
+export default function Editor({ initialText, onSave, analysisResult, setTooltip, onRunAnalysis, isAnalyzing, onExportTxt, onExportDocx, onExportHwp, onToggleRightPanel }) {
   const [activeTab, setActiveTab] = useState('draft') // draft, highlight, run_analysis
   const [fontFamily, setFontFamily] = useState("'MaruBuri', 'Nanum Myeongjo', serif")
   const [fontSize, setFontSize] = useState(16)
@@ -204,6 +204,24 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
           cursor: pointer;
         }
         .font-select:hover { background: #f0f0f0; }
+
+        .export-item-btn {
+          width: 100%;
+          font-size: 13px;
+          text-align: left;
+          border: none;
+          padding: 8px 12px;
+          background: white;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background 0.2s;
+          color: #333;
+          font-weight: 500;
+        }
+        .export-item-btn:hover {
+          background: #f5f5f5;
+          color: #000;
+        }
         
         .analysis-screen {
           display: flex;
@@ -298,9 +316,24 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               </button>
               {isExportOpen && (
-                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, background: 'white', border: '1px solid #ddd', borderRadius: 4, padding: 4, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                  <button className="btn" onClick={onExportTxt} style={{ width: '100%', fontSize: 12, textAlign: 'left', border: 'none', padding: '6px 12px', background: 'white' }}>txt로 저장</button>
-                  <button className="btn" onClick={onExportDocx} style={{ width: '100%', fontSize: 12, textAlign: 'left', border: 'none', padding: '6px 12px', background: 'white' }}>docx로 저장</button>
+                <div style={{ 
+                  position: 'absolute', 
+                  top: '100%', 
+                  right: 0, 
+                  zIndex: 100, 
+                  background: 'white', 
+                  border: '1px solid #ddd', 
+                  borderRadius: 8, 
+                  padding: '6px', 
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minWidth: 120,
+                  overflow: 'hidden'
+                }}>
+                  <button className="export-item-btn" onClick={onExportTxt}>txt로 저장</button>
+                  <button className="export-item-btn" onClick={onExportDocx}>docx로 저장</button>
+                  <button className="export-item-btn" onClick={onExportHwp}>hwp로 저장</button>
                 </div>
               )}
             </div>
@@ -384,7 +417,7 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
       )}
 
       {/* 본문 에디터 영역 */}
-      <div className="scroll-hide" style={{ 
+      <div id="editor-container" className="scroll-hide" style={{ 
         flex: 1, 
         overflowY: 'auto', 
         padding: '20px 20px 40px',

@@ -139,7 +139,7 @@ function HighlightedText({ text, analysisResult, setTooltip }) {
                   textTransform: 'capitalize',
                   color: ISSUE_COLORS[agent] ? '#fff' : '#000',
                   background: ISSUE_COLORS[agent] || 'transparent',
-                  padding: '1px 4px',
+                  //padding: '1px 4px',
                   borderRadius: 3,
                   marginRight: 4
                 }}>{agent}</strong>
@@ -1009,6 +1009,34 @@ function SettingsIcon({ size = 28 }) {
     pushToast('docx로 저장했습니다.', 'success')
   }
 
+  function exportAsHwp() {
+    const text = (activeDoc?.extracted_text || '').trim()
+    if (!text) {
+      pushToast('내보낼 텍스트가 없습니다.', 'warning')
+      return
+    }
+
+    // HWP 호환 HTML 구조 생성
+    const htmlContent = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'Hangeul', 'Malgun Gothic', serif; line-height: 1.6; }
+  p { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+${text.split(/\r?\n/).map(line => `<p>${line || '&nbsp;'}</p>`).join('\n')}
+</body>
+</html>`
+
+    const blob = new Blob([htmlContent], { type: 'application/x-hwp' })
+    const filename = `${docTitleBase}_${makeTimestampName('export')}.hwp`
+    downloadBlob(blob, filename)
+    pushToast('hwp로 저장했습니다.', 'success')
+  }
+
   function onDownloadEnter() {
     if (downloadCloseTimer.current) {
       clearTimeout(downloadCloseTimer.current)
@@ -1044,21 +1072,40 @@ function SettingsIcon({ size = 28 }) {
       {showIntro && <Intro onFinish={() => setShowIntro(false)} />}
       <Tooltip visible={tooltip.visible} content={tooltip.content} position={{ x: tooltip.x, y: tooltip.y }} borderColor={tooltip.borderColor} />
       <style>{`
+        html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100% !important;
+        overflow: hidden !important; /* 가로, 세로 모두 숨김 */
+        touch-action: none; /* 모바일 환경 스크롤 방지 */
+        }
         body {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
         }
         body::-webkit-scrollbar {
-          width: 0;
-          height: 0;
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
         }
         .scroll-hide {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
         }
         .scroll-hide::-webkit-scrollbar {
-          width: 0;
-          height: 0;
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+        }
+        #editor-container {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        #editor-container::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+          background: transparent !important;
         }
         .account-bar {
           width: 100%;
@@ -1723,6 +1770,7 @@ function SettingsIcon({ size = 28 }) {
                 isAnalyzing={isAnalyzing}
                 onExportTxt={exportAsTxt}
                 onExportDocx={exportAsDocx}
+                onExportHwp={exportAsHwp}
                 onToggleRightPanel={() => setIsRightPanelOpen(prev => !prev)}
               />
             ) : (
