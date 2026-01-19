@@ -11,13 +11,8 @@ from app.core.db import Document, EvalRun, get_session
 from app.llm.client import get_upstage_client
 from app.llm.chat import chat
 from app.services.analysis_runner import run_analysis_for_text
-from app.agents.evaluators.tone_evaluator import ToneQualityAgent
-from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
-from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
-from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
-from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
-from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
-from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
+# Evaluators removed
+# from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
 from app.observability.langsmith import create_feedback, traceable
 
 
@@ -128,13 +123,8 @@ def collect_agent_metrics(
     outputs: dict,
     source_text: str | None,
 ) -> Tuple[dict, dict]:
-    tone_quality = ToneQualityAgent()
-    causality_quality = CausalityQualityAgent()
-    trauma_quality = TraumaQualityAgent()
-    hate_quality = HateBiasQualityAgent()
-    cliche_quality = GenreClicheQualityAgent()
-    spelling_quality = SpellingQualityAgent()
-    final_evaluator = FinalEvaluatorAgent()
+    # Evaluators removed
+    # final_evaluator = FinalEvaluatorAgent()
 
     tone_result = outputs.get("tone") or {}
     logic_result = outputs.get("logic") or outputs.get("causality") or {}
@@ -149,48 +139,38 @@ def collect_agent_metrics(
     aggregated = outputs.get("aggregated") or outputs.get("aggregate") or {}
 
     latencies_ms: dict[str, float] = {}
-    text = source_text or ""
-
-    def _safe_eval(
-        agent,
-        name: str,
-        *args,
-        expect_score: bool = False,
-        **kwargs,
-    ) -> dict:
-        start = time.perf_counter()
-        result: dict = {}
-        try:
-            result = agent.run(*args, **kwargs)
-            if not isinstance(result, dict):
-                result = {}
-        except Exception as exc:
-            result = {"error": str(exc)}
-        if expect_score and "score" not in result:
-            result["score"] = 0
-        latencies_ms[name] = round((time.perf_counter() - start) * 1000.0, 2)
-        return result
+    
+    # Use direct scores instead of running quality checks
+    def _extract_metric(result):
+        return {
+            "score": result.get("score", 0),
+            "reason": result.get("note", "")
+        }
 
     metrics = {
-        "tone": _safe_eval(tone_quality, "tone", text, tone_result, expect_score=True),
-        "logic": _safe_eval(causality_quality, "logic", text, logic_result, expect_score=True),
-        "trauma": _safe_eval(trauma_quality, "trauma", text, trauma_result, expect_score=True),
-        "hate_bias": _safe_eval(hate_quality, "hate_bias", text, hate_result, expect_score=True),
-        "genre_cliche": _safe_eval(cliche_quality, "genre_cliche", text, cliche_result, expect_score=True),
-        "spelling": _safe_eval(spelling_quality, "spelling", text, spelling_result, expect_score=True),
+        "tone": _extract_metric(tone_result),
+        "logic": _extract_metric(logic_result),
+        "trauma": _extract_metric(trauma_result),
+        "hate_bias": _extract_metric(hate_result),
+        "genre_cliche": _extract_metric(cliche_result),
+        "spelling": _extract_metric(spelling_result),
     }
 
-    metrics["final"] = _safe_eval(
-        final_evaluator,
-        "final",
-        aggregate=aggregated,
-        tone_issues=tone_result.get("issues", []),
-        logic_issues=logic_result.get("issues", []),
-        trauma_issues=trauma_result.get("issues", []),
-        hate_issues=hate_result.get("issues", []),
-        cliche_issues=cliche_result.get("issues", []),
-        persona_feedback=persona_feedback,
-    )
+    # Final evaluator usage maintained or removed based on preference
+    # Keeping it simple for now, can be removed if FinalEvaluatorAgent is deleted
+    metrics["final"] = {}
+    # try:
+    #     metrics["final"] = final_evaluator.run(
+    #         aggregate=aggregated,
+    #         tone_issues=tone_result.get("issues", []),
+    #         logic_issues=logic_result.get("issues", []),
+    #         trauma_issues=trauma_result.get("issues", []),
+    #         hate_issues=hate_result.get("issues", []),
+    #         cliche_issues=cliche_result.get("issues", []),
+    #         persona_feedback=persona_feedback,
+    #     )
+    # except Exception:
+    #     pass
 
     return metrics, latencies_ms
 

@@ -22,7 +22,7 @@ class ToneEvaluatorAgent(BaseAgent):
 
     name = "tone-evaluator"
 
-    def run(self, split_payload: object, reader_context: dict | None = None, global_summary: str | None = None) -> dict:
+    def run(self, split_payload: object, global_summary: str | None = None, persona: dict | None = None) -> dict:
         system = """
         너는 JSON 출력 전용 엔진이다.
         반드시 유효한 JSON만 출력해야 한다.
@@ -33,27 +33,31 @@ class ToneEvaluatorAgent(BaseAgent):
         split_context = format_split_payload(split_payload)
         
         persona_text = ""
-        if reader_context:
-            persona_text = f"\n[독자 페르소나 정보]\n{json.dumps(reader_context, ensure_ascii=False)}\n위 독자의 성향과 배경지식을 고려하여, 해당 독자가 이질감을 느낄 만한 말투를 분석하라."
+        if persona:
+            persona_text = f"""
+            [독자 페르소나]
+            - 나이/직업: {persona.get('age', '미상')} / {persona.get('job', '미상')}
+            - 성향: {persona.get('trait', '정보 없음')}
+            - 독서 취향: {persona.get('preference', '정보 없음')}
+            
+            위 독자가 이 글을 읽는다고 가정하고 평가하라.
+            """
 
         prompt = f"""
         다음은 원고의 문장 목록이다.
 
-        너의 역할은 단순한 분석가가 아니라, **철저한 '독자 대변인(Reader Advocate)'**이다.
-        네 개인적인 기준이나 보편적인 기준은 중요하지 않다.
-        오직 **[독자 페르소나 정보]에 정의된 특정 독자의 입장**에서만 판단하라.
+        너의 역할은 '말투 분석 에이전트'이다.
 
         [전체 맥락 요약 (참조용)]
         {global_summary or "제공되지 않음"}
+        
         {persona_text}
 
-        행동 강령:
-        1. **독자 빙의**: 위 독자가 이 글을 읽는다고 상상하라. 이 독자가 불편함, 어색함, 지루함을 느낄만한 지점을 찾아내라.
-        2. **적극적 방어**: 보편적으로는 허용되는 말투라도, 이 독자의 성향(연령, 배경, 취향)에 맞지 않으면 가차 없이 지적하라.
-        3. **이유 명시**: 지적할 때는 "이 독자는 ~한 성향이므로 이 표현을 ~하게 느낄 것이다"라고 독자 관점에서 이유를 설명하라.
+        너의 임무:
+        1. 문체와 서술 방식이 독자의 몰입을 방해하는지 분석하여 '이슈'를 식별하라.
+        2. 글 전체의 문체 완성도와 독자 적합성을 0~100점 사이의 점수('score')로 평가하라.
 
         반드시 지켜야 할 규칙:
-        - 점수, 등급, 총평을 만들지 말 것
         - 문장을 수정하거나 대체 표현을 제안하지 말 것
         - 오직 '독자 관점에서 개연성이 약해지는 말투 지점'만 식별할 것
         - [전체 맥락 요약]을 참고하여, 인물의 말투가 상황이나 설정에 어긋나는지 확인하라.
@@ -67,6 +71,7 @@ class ToneEvaluatorAgent(BaseAgent):
 
         출력 형식(JSON):
         {{
+          "score": <int 0-100, 독자가 느끼는 문체의 자연스러움 및 몰입도 점수>,
           "issues": [
             {{
               "issue_type": "tone_shift | tone_mismatch | register_mismatch",

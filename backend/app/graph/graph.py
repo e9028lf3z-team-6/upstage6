@@ -1,4 +1,3 @@
-import json
 from langgraph.graph import StateGraph, END
 from app.graph.state import AgentState
 
@@ -70,75 +69,12 @@ graph.add_edge("reader_persona", "split")
 # split → summary
 graph.add_edge("split", "summary")
 
-# split → persona_feedback (Wait, persona_feedback needs summary? Original was summary->persona_feedback)
-# Re-checking original: graph.add_edge("summary", "persona_feedback")
-# But persona_feedback is also an evaluator-like node.
-# Let's keep it connected to summary for now, but maybe it should be parallel too?
-# Current logic: Summary is context for persona feedback.
+# persona_feedback는 summary 이후에 실행 (요약본 참고 가능하도록)
 graph.add_edge("summary", "persona_feedback")
-
-# --------------------------------------------------
-# Routing Logic (Selective Execution)
-# --------------------------------------------------
-def route_to_evaluators(state: AgentState):
-    """
-    meta_json의 settings.selected_agents를 확인하여
-    실행할 평가 에이전트 노드들의 리스트를 반환합니다.
-    """
-    all_evaluators = [
-        "tone", "logic", "trauma", "hate_bias", 
-        "genre_cliche", "spelling", "tension_curve"
-    ]
-    
-    context_str = state.get("context")
-    if not context_str:
-        return all_evaluators # Default: Run all if no settings
-
-    try:
-        if isinstance(context_str, dict):
-            meta = context_str
-        else:
-            meta = json.loads(context_str)
-
-        settings = meta.get("settings", {})
-        selected = settings.get("selected_agents")
-        
-        if not selected or not isinstance(selected, list):
-            return all_evaluators # Default: Run all if selection is missing/empty
-            
-        # Filter valid nodes only
-        to_run = [agent for agent in selected if agent in all_evaluators]
-        
-        if not to_run:
-            return all_evaluators # Fallback: Run all if filter resulted in empty list
-            
-        return to_run
-        
-    except json.JSONDecodeError:
-        return all_evaluators
 
 # --------------------------------------------------
 # Evaluators (parallel fan-out)
 # --------------------------------------------------
-
-# summary -> [Selected Evaluators]
-graph.add_conditional_edges(
-    "summary",
-    route_to_evaluators,
-    # Map is not strictly needed if function returns node names directly, 
-    # but explicit mapping is good practice in LangGraph.
-    {
-        "tone": "tone",
-        "logic": "logic",
-        "trauma": "trauma",
-        "hate_bias": "hate_bias",
-        "genre_cliche": "genre_cliche",
-        "spelling": "spelling",
-        "tension_curve": "tension_curve"
-    }
-)
-
-# Evaluators -> Aggregate
 for node in [
     "tone",
     "logic",
@@ -148,6 +84,7 @@ for node in [
     "spelling",
     "tension_curve",
 ]:
+    graph.add_edge("summary", node)
     graph.add_edge(node, "aggregate")
 
 # persona feedback도 aggregate로

@@ -66,11 +66,7 @@ uvicorn main:app --port 8000
 
 cd backend
 .venv\Scripts\activate
-<<<<<<< HEAD
-python -m uvicorn main:app --port 8000
-=======
 uvicorn main:app --port 8000
->>>>>>> origin/frontend
 ### 4. SQLite 마이그레이션 (필요 시)
 기존 `backend/data/team.db`에 컬럼을 추가하려면 아래 스크립트를 실행하세요.
 이미 적용된 컬럼이 있으면 자동으로 건너뜁니다.
@@ -85,12 +81,9 @@ cd frontend
 # 의존성 설치
 npm install
 
-<<<<<<< HEAD
 # docx 깔기
 npm install docx
 
-=======
->>>>>>> origin/frontend
 # 개발 서버 실행
 npm run dev
 ```

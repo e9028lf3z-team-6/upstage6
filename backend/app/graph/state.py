@@ -1,11 +1,16 @@
 # app/graph/state.py
-from typing import TypedDict, Optional, Dict, Any, List, Union
+from typing import TypedDict, Optional, Dict, Any, List, Union, Annotated
 
+def merge_logs(left: Optional[List[Dict[str, Any]]], right: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    if left is None: left = []
+    if right is None: right = []
+    return left + right
 
 class AgentState(TypedDict, total=False):
     # entry
     original_text: str
-    context: Optional[Union[str, Dict[str, Any]]]
+    context: Optional[str]
+    logs: Annotated[List[Dict[str, Any]], merge_logs]  # [{agent: str, message: str, type: str, timestamp: float}]
 
     # preprocessing
     split_text: Optional[Union[List[str], Dict[str, Any], str]]

@@ -1,6 +1,6 @@
-# app/graph/nodes/tone_node.py
 from app.agents import ToneEvaluatorAgent
 from app.graph.state import AgentState
+from app.graph.nodes.utils import add_log
 from app.observability.langsmith import traceable_timed
 import logging
 
@@ -10,27 +10,23 @@ tone_agent = ToneEvaluatorAgent()
 
 @traceable_timed(name="tone")
 def tone_node(state: AgentState) -> AgentState:
-    logger.info("[PROGRESS] 3/6 - [Tone] 톤앤매너 분석 시작...")
+    logger.info("톤앤매너 분석: [START]")
+    logs = add_log("문체 전문가", "글의 분위기와 말투가 독자들에게 어떻게 전달될지 분석해 볼게요. 펜을 든 작가님의 마음을 느껴보겠습니다.")
     
-    split_text = state.get("split_text")
-    if not split_text or (isinstance(split_text, dict) and not split_text.get("split_sentences")):
-        logger.warning("tone_node: No text to analyze.")
-        return {"tone_result": {"issues": [], "score": 10, "note": "분석할 텍스트가 없습니다."}}
-
-    reader_context = None
-    if state.get("reader_persona"):
-        reader_context = state["reader_persona"].get("persona", {})
-
-    try:
-        result = tone_agent.run(
-            split_text,
-            reader_context=reader_context,
-            global_summary=state.get("global_summary")
-        )
-    except Exception as e:
-        logger.error(f"Error in tone_node: {e}")
-        result = {"issues": [], "score": 0, "error": str(e)}
-
+    result = tone_agent.run(
+        state.get("split_text"),
+        global_summary=state.get("global_summary"),
+        persona=state.get("reader_persona")
+    )
+    
+    issue_count = len(result.get("issues", []))
+    if issue_count > 0:
+        logs += add_log("문체 전문가", f"작가님, 글의 톤을 조금 더 일관되게 다듬으면 좋을 지점을 {issue_count}군데 정도 찾았어요. 리포트를 참고해 주세요!")
+    else:
+        logs += add_log("문체 전문가", "와! 문체와 톤앤매너가 정말 훌륭해요. 작가님만의 색깔이 잘 묻어나는 매력적인 글이네요.")
+        
+    logger.info("톤앤매너 분석: [END]")
     return {
-        "tone_result": result
+        "tone_result": result,
+        "logs": logs
     }

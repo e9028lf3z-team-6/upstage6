@@ -2,8 +2,6 @@ from typing import Dict
 from app.agents.base import BaseAgent
 from app.llm.chat import chat
 from app.agents.utils import format_split_payload
-import json
-
 
 
 class TensionCurveAgent(BaseAgent):
@@ -23,7 +21,7 @@ class TensionCurveAgent(BaseAgent):
 
     name = "tension-curve-tools"
 
-    def run(self, split_payload: object, reader_context: dict | None = None) -> Dict:
+    def run(self, split_payload: object, persona: dict | None = None) -> Dict:
         system = """
 You are a strict JSON generator.
 You MUST output valid JSON only.
@@ -31,75 +29,79 @@ Do NOT include explanations or markdown.
 """
 
         split_context = format_split_payload(split_payload)
-        
+
         persona_text = ""
-        if reader_context:
-            persona_text = f"\n[독자 페르소나 정보]\n{json.dumps(reader_context, ensure_ascii=False)}\n위 독자의 성향에 따라, 긴장감을 느끼는 포인트나 지루함을 느끼는 임계치가 다를 수 있음을 감안하라."
+        if persona:
+            persona_text = f"""
+            [독자 페르소나]
+            - 나이/직업: {persona.get('age', '미상')} / {persona.get('job', '미상')}
+            - 성향: {persona.get('trait', '정보 없음')}
+            - 독서 취향: {persona.get('preference', '정보 없음')}
+            
+            위 독자가 이 글을 읽는다고 가정하고 평가하라.
+            """
 
         prompt = f"""
-다음은 원고의 문장 목록이다.
+        다음은 원고의 문장 목록이다.
 
-너는 **이 독자의 몰입도를 측정하는 '관찰자'**이다.
-사건 흐름을 따라 독자가 느끼는 긴장도의 변화를 분석하라.
-{persona_text}
+        너의 역할은 '서사 긴장도 분석가'이다.
+        사건 흐름을 따라 독자가 느끼는 긴장도의 변화를 분석하라.
+        
+        {persona_text}
 
-행동 강령:
-- 단순한 사건의 경중이 아니라, **이 독자가 느낄 심리적 텐션**을 추적하라.
-- 독자가 '빠른 호흡'을 선호한다면, 서술이 길어질 때 긴장도가 떨어진다고 판단하라.
-- 독자가 '세밀한 묘사'를 선호한다면, 사건이 없어도 긴장도가 유지된다고 판단하라.
+        분석 기준:
+        - 긴장도는 독자의 심리적 몰입 관점에서 판단
+        - 다음 세 가지 상태 중 하나로만 분류
+          * increase
+          * maintain
+          * decrease
 
-분석 기준:
-- 긴장도는 독자의 심리적 몰입 관점에서 판단
-- 다음 세 가지 상태 중 하나로만 분류
-  * increase
-  * maintain
-  * decrease
+        지시사항:
+        1. 독자 관점에서 긴장감(몰입감)이 떨어지거나 구조적으로 이상한 구간을 식별하라.
+        2. 글 전체의 긴장감 조절 및 몰입도를 0~100점 사이의 점수('score')로 평가하라.
+        3. 수정 제안 금지
 
-지시사항:
-- 점수, 수치, 그래프 좌표 생성 금지
-- 수정 제안 금지
-- 오직 '긴장도 흐름'과 '구조적 이상 징후'만 기술
+        출력 JSON 형식:
+        {{
+          "score": <int 0-100, 독자가 느끼는 긴장감 및 몰입도 점수>,
+          "curve": [
+            {{
+              "stage": "사건 흐름 단계 또는 섹션",
+              "tension": "increase | maintain | decrease",
+              "reason": "독자 관점에서 그렇게 판단한 간단한 이유"
+            }}
+          ],
+          "issues": [
+            {{
+              "issue_type": "tension_drop | climax_missing | tension_overload | stagnation",
+              "severity": "low | medium | high",
+              "sentence_index": 0,
+              "char_start": 0,
+              "char_end": 0,
+              "quote": "문제 구간 원문 인용",
+              "reason": "서사 구조 관점에서의 문제 설명",
+              "confidence": 0.0
+            }}
+          ],
+          "anomalies": [
+            {{
+              "location": "문제 구간",
+              "issue": "긴장 급락 | 클라이맥스 부재 | 긴장 과도 | 반복 정체",
+              "description": "서사 구조 관점에서의 문제 설명"
+            }}
+          ]
+        }}
 
-출력 JSON 형식:
-{{
-  "curve": [
-    {{
-      "stage": "사건 흐름 단계 또는 섹션",
-      "tension": "increase | maintain | decrease",
-      "reason": "독자 관점에서 그렇게 판단한 간단한 이유"
-    }}
-  ],
-  "issues": [
-    {{
-      "issue_type": "tension_drop | climax_missing | tension_overload | stagnation",
-      "severity": "low | medium | high",
-      "sentence_index": 0,
-      "char_start": 0,
-      "char_end": 0,
-      "quote": "문제 구간 원문 인용",
-      "reason": "서사 구조 관점에서의 문제 설명",
-      "confidence": 0.0
-    }}
-  ],
-  "anomalies": [
-    {{
-      "location": "문제 구간",
-      "issue": "긴장 급락 | 클라이맥스 부재 | 긴장 과도 | 반복 정체",
-      "description": "서사 구조 관점에서의 문제 설명"
-    }}
-  ]
-}}
+        특별한 이상이 없다면 issues/anomalies는 빈 배열로 반환하라.
 
-특별한 이상이 없다면 issues/anomalies는 빈 배열로 반환하라.
+        규칙:
+        - sentence_index는 문장 목록 JSON 배열의 인덱스다.
+        - char_start/end는 해당 문장 내 0-based 위치다.
+        - quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
 
-규칙:
-- sentence_index는 문장 목록 JSON 배열의 인덱스다.
-- char_start/end는 해당 문장 내 0-based 위치다.
-- quote는 반드시 해당 문장에 존재하는 원문 그대로 사용한다.
-
-문장 목록:
-{split_context}
-"""
+        문장 목록:
+        {split_context}
+        """
 
         response = chat(prompt, system=system)
         return self._safe_json_load(response)

@@ -1,6 +1,6 @@
 # app/services/pipeline_runner.py
 
-from app.agents.tools.split_agent import SplitAgent
+from app.agents.tools.split import Splitter
 from app.agents.tools.tone_agent import ToneEvaluatorAgent
 from app.agents.tools.causality_agent import CausalityEvaluatorAgent
 from app.agents.tools.TensionCurve_agent import TensionCurveAgent
@@ -16,23 +16,18 @@ from app.agents.tools.persona_feedback import PersonaFeedbackAgent
 from app.agents.tools.llm_aggregator import IssueBasedAggregatorAgent
 from app.agents.tools.rewrrite_assist import RewriteAssistAgent
 
-from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
+# from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
 from app.agents.tools.report_agent import ComprehensiveReportAgent
 
-# Evaluators
-from app.agents.evaluators.tone_evaluator import ToneQualityAgent
-from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
-from app.agents.evaluators.tension_evaluator import TensionQualityAgent
-from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
-from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
-from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
-from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
+# Evaluators removed
+# ...
+
 from app.services.issue_normalizer import normalize_issues
 from app.services.split_map import build_split_payload
 
 
 # ---- singleton instances (서비스와 동일)
-split_agent = SplitAgent()
+splitter = Splitter()
 tone_agent = ToneEvaluatorAgent()
 causality_agent = CausalityEvaluatorAgent()
 tension_agent = TensionCurveAgent()
@@ -47,30 +42,25 @@ persona_feedback_agent = PersonaFeedbackAgent()
 
 aggregator = IssueBasedAggregatorAgent()
 rewrite_agent = RewriteAssistAgent()
-final_evaluator_agent = FinalEvaluatorAgent()
+# final_evaluator_agent = FinalEvaluatorAgent()
 report_agent = ComprehensiveReportAgent()
 
-# Evaluator instances
-tone_quality_agent = ToneQualityAgent()
-causality_quality_agent = CausalityQualityAgent()
-tension_quality_agent = TensionQualityAgent()
-trauma_quality_agent = TraumaQualityAgent()
-hatebias_quality_agent = HateBiasQualityAgent()
-cliche_quality_agent = GenreClicheQualityAgent()
-spelling_quality_agent = SpellingQualityAgent()
+# Evaluator instances removed
+# tone_quality_agent = ToneQualityAgent()
+# ...
 
 
-def run_full_pipeline(text: str, *, context: dict | None = None, debug: bool = False, mode: str = "full"):
+def run_full_pipeline(text: str, *, debug: bool = False, mode: str = "full"):
     def _fallback_split_payload(source_text: str) -> dict:
         return build_split_payload(source_text)
 
     # 1. split
     try:
-        split_result = split_agent.run(text)
+        split_result = splitter.run(text)
         if not isinstance(split_result, dict):
             split_result = _fallback_split_payload(str(split_result))
     except Exception as e:
-        print(f"Split agent failed: {e}")
+        print(f"Splitter failed: {e}")
         # fallback
         split_result = _fallback_split_payload(text)
 
@@ -78,14 +68,10 @@ def run_full_pipeline(text: str, *, context: dict | None = None, debug: bool = F
     persona = None
     reader_context = None
     try:
-        persona_input = {
+        persona = persona_agent.run({
             "text": text,
             "split_sentences": split_result.get("split_sentences", []),
-        }
-        if context:
-            persona_input.update(context)
-
-        persona = persona_agent.run(persona_input)
+        })
         reader_context = persona.get("persona")
     except Exception:
         pass
@@ -107,26 +93,27 @@ def run_full_pipeline(text: str, *, context: dict | None = None, debug: bool = F
             return agent.run(*args, **kwargs)
         except Exception as e:
             print(f"Agent {agent.name} failed: {e}")
-            return {"issues": [], "error": str(e)}
+            return {"issues": [], "error": str(e), "score": 0}
 
     # Initialize empty results
-    tone = {"issues": []}
-    causality = {"issues": []}
-    tension = {"curve": []}
-    trauma = {"issues": []}
-    hate = {"issues": []}
-    cliche = {"issues": []}
-    spelling = {"issues": []}
+    tone = {"issues": [], "score": 0}
+    causality = {"issues": [], "score": 0}
+    tension = {"curve": [], "score": 0}
+    trauma = {"issues": [], "score": 0}
+    hate = {"issues": [], "score": 0}
+    cliche = {"issues": [], "score": 0}
+    spelling = {"issues": [], "score": 0}
 
     # Run Causality (Always)
-    causality = safe_run(causality_agent, split_result, reader_context=reader_context)
+    # Pass persona instead of reader_context
+    causality = safe_run(causality_agent, split_result, persona=reader_context)
 
     if mode == "full":
-        tone = safe_run(tone_agent, split_result)
-        tension = safe_run(tension_agent, split_result)
+        tone = safe_run(tone_agent, split_result, persona=reader_context)
+        tension = safe_run(tension_agent, split_result, persona=reader_context)
         trauma = safe_run(trauma_agent, split_result)
         hate = safe_run(hate_bias_agent, split_result)
-        cliche = safe_run(genre_cliche_agent, split_result)
+        cliche = safe_run(genre_cliche_agent, split_result, persona=reader_context)
         spelling = safe_run(spelling_agent, split_result)
 
     # 5. aggregate
@@ -158,22 +145,22 @@ def run_full_pipeline(text: str, *, context: dict | None = None, debug: bool = F
 
     # 6. final evaluator
     final_metric = {}
-    if mode == "full":
-        try:
-            final_metric = final_evaluator_agent.run(
-                aggregate=aggregate.dict() if hasattr(aggregate, 'dict') else aggregate,
-                tone_issues=tone.get("issues", []),
-                logic_issues=causality.get("issues", []),
-                trauma_issues=trauma.get("issues", []),
-                hate_issues=hate.get("issues", []),
-                cliche_issues=cliche.get("issues", []),
-                persona_feedback=(
-                    persona_feedback.get("persona_feedback")
-                    if persona_feedback else None
-                ),
-            )
-        except Exception:
-            final_metric = {}
+    # if mode == "full":
+    #     try:
+    #         final_metric = final_evaluator_agent.run(
+    #             aggregate=aggregate.dict() if hasattr(aggregate, 'dict') else aggregate,
+    #             tone_issues=tone.get("issues", []),
+    #             logic_issues=causality.get("issues", []),
+    #             trauma_issues=trauma.get("issues", []),
+    #             hate_issues=hate.get("issues", []),
+    #             cliche_issues=cliche.get("issues", []),
+    #             persona_feedback=(
+    #                 persona_feedback.get("persona_feedback")
+    #                 if persona_feedback else None
+    #             ),
+    #         )
+    #     except Exception:
+    #         final_metric = {}
 
     # 7. Comprehensive Report (NEW)
     report = {}
@@ -196,19 +183,19 @@ def run_full_pipeline(text: str, *, context: dict | None = None, debug: bool = F
     else:
         report = {"full_report_markdown": "# 개연성 분석 리포트\n\n로그인하지 않은 상태에서는 **개연성(Causality)** 분석 결과만 제공됩니다.\n\n## 분석 결과 요약\n" + str(causality.get("issues", []))}
 
-    # 8. Evaluation Scores (QA)
+    # 8. Evaluation Scores (QA) -> Direct Score Mapping
     qa_scores = {}
     try:
         if mode == "full":
-            qa_scores["tone"] = tone_quality_agent.run(text, tone).get("score", 0)
-            qa_scores["tension"] = tension_quality_agent.run(text, tension).get("score", 0)
-            qa_scores["trauma"] = trauma_quality_agent.run(text, trauma).get("score", 0)
-            qa_scores["hate_bias"] = hatebias_quality_agent.run(text, hate).get("score", 0)
-            qa_scores["cliche"] = cliche_quality_agent.run(text, cliche).get("score", 0)
-            qa_scores["spelling"] = spelling_quality_agent.run(text, spelling).get("score", 0)
+            qa_scores["tone"] = tone.get("score", 0)
+            qa_scores["tension"] = tension.get("score", 0)
+            qa_scores["trauma"] = trauma.get("score", 0)
+            qa_scores["hate_bias"] = hate.get("score", 0)
+            qa_scores["cliche"] = cliche.get("score", 0)
+            qa_scores["spelling"] = spelling.get("score", 0)
         
         # Causality is always run
-        qa_scores["causality"] = causality_quality_agent.run(text, causality).get("score", 0)
+        qa_scores["causality"] = causality.get("score", 0)
 
     except Exception as e:
         print(f"QA Evaluation failed: {e}")

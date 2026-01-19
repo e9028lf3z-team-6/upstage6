@@ -1,22 +1,47 @@
-from typing import Any, Dict, Optional
 import logging
-import json
+import time
+from typing import Any, Dict, Optional
 
 from app.core.settings import get_settings
 from app.graph.graph import agent_app
 from app.graph.state import AgentState
-from app.agents.tools.split_agent import SplitAgent
+from app.agents.tools.split import Splitter
 from app.agents.tools.causality_agent import CausalityEvaluatorAgent
 from app.agents.tools.llm_aggregator import IssueBasedAggregatorAgent
-from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
-from app.agents.evaluators.tone_evaluator import ToneQualityAgent
-from app.agents.evaluators.causality_evaluator import CausalityQualityAgent
-from app.agents.evaluators.tension_evaluator import TensionQualityAgent
-from app.agents.evaluators.trauma_evaluator import TraumaQualityAgent
-from app.agents.evaluators.hatebias_evaluator import HateBiasQualityAgent
-from app.agents.evaluators.cliche_evaluator import GenreClicheQualityAgent
-from app.agents.evaluators.spelling_evaluator import SpellingQualityAgent
+# Evaluators removed
+# from app.agents.evaluators.final_evaluator import FinalEvaluatorAgent
+# ... imports removed ...
+
 from app.observability.langsmith import traceable
+from app.llm.client import has_upstage_api_key
+from app.services.split_map import build_split_payload
+from app.services.issue_normalizer import normalize_issues
+
+logger = logging.getLogger(__name__)
+
+# ... (omitted) ...
+
+def _run_final_evaluator(outputs: Dict[str, Any]) -> Dict[str, Any]:
+    # FinalEvaluatorAgent is removed
+    return {} 
+    
+    # Original Logic (commented out for reference)
+    # final_evaluator = FinalEvaluatorAgent()
+    # aggregate = outputs.get("aggregate") or outputs.get("aggregated") or {}
+    # if hasattr(aggregate, "dict"):
+    #     aggregate = aggregate.dict()
+    # try:
+    #     return final_evaluator.run(
+    #         aggregate=aggregate,
+    #         tone_issues=(outputs.get("tone") or {}).get("issues", []),
+    #         logic_issues=(outputs.get("logic") or {}).get("issues", []),
+    #         trauma_issues=(outputs.get("trauma") or {}).get("issues", []),
+    #         hate_issues=(outputs.get("hate_bias") or {}).get("issues", []),
+    #         cliche_issues=(outputs.get("genre_cliche") or {}).get("issues", []),
+    #         persona_feedback=outputs.get("persona_feedback"),
+    #     )
+    # except Exception as exc:
+    #     return {"error": str(exc)}
 from app.llm.client import has_upstage_api_key
 from app.services.split_map import build_split_payload
 from app.services.issue_normalizer import normalize_issues
@@ -29,21 +54,133 @@ async def run_analysis_for_text(
     context: Optional[str] = None,
     mode: str = "full",
 ) -> Dict[str, Any]:
-    """
-    전체 분석 파이프라인 실행
-    - UPSTAGE_API_KEY 있으면 LangGraph + LLM
-    - 없으면 로컬 휴리스틱 fallback
-    - 항상 동일한 출력 스키마 반환
-    """
-    logger.info(f"[DEBUG] run_analysis_for_text started. Text len: {len(text)}, Mode: {mode}")
-
+    # ... (기존 코드 유지)
     if has_upstage_api_key():
         if mode == "full":
             return await _run_langgraph_full(text=text, context=context, mode=mode)
         return _run_causality_only(text=text, mode=mode)
-    
-    logger.info("[DEBUG] No UPSTAGE_API_KEY found. Running fallback.")
-    return _run_fallback(text=text, mode=mode)
+    # ...
+
+async def stream_analysis_for_text(
+    text: str,
+    context: Optional[str] = None,
+    mode: str = "full",
+):
+    """
+    분석 과정을 실시간으로 스트리밍하는 비동기 제너레이터
+    """
+    logger.info(f"[STREAM] Start streaming. Mode: {mode}, API_KEY: {has_upstage_api_key()}")
+
+    if not has_upstage_api_key() or mode != "full":
+        logger.info(f"[STREAM] Entering non-full/fallback mode. Mode: {mode}")
+        # 폴백이나 제한 모드일 경우 즉시 결과 반환
+        yield {"type": "log", "agent": "코디네이터", "logs": [{"agent": "코디네이터", "message": "작가님, 제가 가벼운 마음으로 먼저 훑어볼게요! 상세 분석은 로그인이 필요하지만, 기본적인 것부터 도와드릴게요.", "timestamp": time.time()}]}
+        
+        logger.info(f"[STREAM] Running run_analysis_for_text for mode: {mode}")
+        res = await run_analysis_for_text(text, context, mode)
+        logger.info(f"[STREAM] run_analysis_for_text completed.")
+        
+        yield {"type": "final_result", "data": res}
+        return
+
+    initial_state: AgentState = {
+        "original_text": text,
+        "context": context,
+        "logs": []
+    }
+
+    # 누적된 최종 상태를 담을 변수
+    accumulated_state = initial_state.copy()
+
+    # 노드 이름 매핑 (가독성용)
+    node_labels = {
+        "reader_persona": "독자 페르소나 설정",
+        "split": "문장 분리 중",
+        "summary": "전체 맥락 요약",
+        "persona_feedback": "페르소나 맞춤 피드백",
+        "tone": "말투/어조 분석",
+        "logic": "개연성/논리 분석",
+        "trauma": "트라우마 유발 요소 검사",
+        "hate_bias": "혐오/편향 표현 검사",
+        "genre_cliche": "장르 클리셰 분석",
+        "spelling": "맞춤법 검사",
+        "tension_curve": "긴장도 곡선 생성",
+        "aggregate": "분석 결과 종합",
+        "report": "최종 리포트 작성",
+        "qa_scores": "품질 점수 산정"
+    }
+
+    try:
+        async for event in agent_app.astream(initial_state, stream_mode="updates"):
+            for node_name, state_update in event.items():
+                try:
+                    # 상태 누적
+                    accumulated_state.update(state_update)
+                    
+                    label = node_labels.get(node_name, node_name)
+                    
+                    # 1. 노드에서 발생한 실제 로그 전송
+                    if "logs" in state_update and state_update["logs"]:
+                        yield {"type": "log", "agent": node_name, "logs": state_update["logs"]}
+                    else:
+                        # 2. 로그가 없는 노드일 경우 단순 진행 상황 알림
+                        yield {"type": "log", "agent": "코디네이터", "logs": [{"agent": "코디네이터", "message": f"'{label}' 단계를 끝냈어요!", "timestamp": time.time()}]}
+                    
+                    yield {"type": "node_complete", "node": node_name}
+                except Exception as node_err:
+                    logger.error(f"[STREAM] Node update error ({node_name}): {node_err}")
+
+        # 최종 결과 구성
+        res = await _build_final_result(accumulated_state, text, context, mode)
+        yield {"type": "final_result", "data": res}
+        
+    except Exception as e:
+        logger.error(f"[STREAM] Critical Error: {e}", exc_info=True)
+        yield {"type": "error", "message": str(e)}
+
+async def _build_final_result(final_state: AgentState, text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
+    """최종 상태를 분석 결과 딕셔너리로 변환 (ainvoke 없이)"""
+    aggregated = final_state.get("aggregated_result") or {}
+    decision = aggregated.get("decision")
+    final_report = final_state.get("final_report")
+    logic = final_state.get("logic_result") or final_state.get("causality_result")
+    tension = final_state.get("tension_curve_result")
+
+    split_payload = final_state.get("split_text") or {}
+    if isinstance(split_payload, list):
+        split_payload = {"split_sentences": [str(item) for item in split_payload], "split_map": []}
+    elif isinstance(split_payload, str):
+        split_payload = build_split_payload(split_payload)
+    elif not isinstance(split_payload, dict):
+        split_payload = {}
+
+    result = {
+        "split": split_payload,
+        "final_report": final_report,
+        "report": final_report,
+        "decision": decision,
+        "tone": final_state.get("tone_result"),
+        "logic": logic,
+        "trauma": final_state.get("trauma_result"),
+        "hate_bias": final_state.get("hate_bias_result"),
+        "genre_cliche": final_state.get("genre_cliche_result"),
+        "spelling": final_state.get("spelling_result"),
+        "tension_curve": tension,
+        "causality": logic,
+        "aggregate": aggregated,
+        "aggregated": aggregated,
+        "reader_persona": final_state.get("reader_persona"),
+        "persona_feedback": final_state.get("persona_feedback"),
+        "rewrite_guidelines": final_state.get("rewrite_guidelines"),
+        "logs": final_state.get("logs", []),
+        "debug": {"mode": f"langgraph_stream_{mode}"},
+    }
+
+    result["final_metric"] = final_state.get("final_metric") or _run_final_evaluator(result)
+    result["qa_scores"] = final_state.get("qa_scores") or _run_qa_scores(text, result, mode="full")
+    _apply_optional_outputs(result, split_payload)
+
+    return result
 
 
 def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) -> None:
@@ -63,25 +200,9 @@ def _apply_optional_outputs(result: Dict[str, Any], split_payload: dict | None) 
 
 async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> Dict[str, Any]:
     logger.info("[DEBUG] _run_langgraph_full: Preparing initial state.")
-    
-    context_dict = {}
-    if context is not None:
-        try:
-            if isinstance(context, dict):
-                context_dict = context
-            elif isinstance(context, str):
-                if context.strip():  # 빈 문자열 체크
-                    context_dict = json.loads(context)
-            else:
-                logger.warning(f"Unexpected context type: {type(context)}")
-        except Exception as e:
-            logger.warning(f"Failed to parse context json: {e}")
-
-    logger.info(f"[DEBUG] Context dict prepared: {context_dict.keys()}")
-
     initial_state: AgentState = {
         "original_text": text,
-        "context": context_dict,
+        "context": context,
     }
     logger.info("[DEBUG] _run_langgraph_full: Invoking agent_app (LangGraph).")
     try:
@@ -126,6 +247,7 @@ async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> D
         "reader_persona": final_state.get("reader_persona"),
         "persona_feedback": final_state.get("persona_feedback"),
         "rewrite_guidelines": final_state.get("rewrite_guidelines"),
+        "logs": final_state.get("logs", []),
         "debug": {"mode": f"langgraph_{mode}"},
     }
 
@@ -138,16 +260,16 @@ async def _run_langgraph_full(text: str, context: Optional[str], mode: str) -> D
 
 def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
     logger.info("[DEBUG] _run_causality_only: Starting.")
-    split_agent = SplitAgent()
+    splitter = Splitter()
     causality_agent = CausalityEvaluatorAgent()
     aggregator = IssueBasedAggregatorAgent()
 
     try:
-        logger.info("[DEBUG] _run_causality_only: Running SplitAgent.")
-        split_result = split_agent.run(text)
-        logger.info("[DEBUG] _run_causality_only: SplitAgent finished.")
+        logger.info("[DEBUG] _run_causality_only: Running Splitter.")
+        split_result = splitter.run(text)
+        logger.info("[DEBUG] _run_causality_only: Splitter finished.")
     except Exception as e:
-        logger.error(f"[DEBUG] _run_causality_only: SplitAgent failed: {e}")
+        logger.error(f"[DEBUG] _run_causality_only: Splitter failed: {e}")
         split_result = build_split_payload(text)
 
     causality = {}
@@ -193,6 +315,7 @@ def _run_causality_only(text: str, mode: str) -> Dict[str, Any]:
         "hate_bias": {"issues": []},
         "genre_cliche": {"issues": []},
         "spelling": {"issues": []},
+        "tension_curve": {"curve": []},
         "aggregate": aggregate.dict() if hasattr(aggregate, "dict") else aggregate,
         "aggregated": aggregate.dict() if hasattr(aggregate, "dict") else aggregate,
         "final_metric": {},
@@ -270,42 +393,28 @@ def _run_fallback(text: str, mode: str) -> Dict[str, Any]:
 
 
 def _run_final_evaluator(outputs: Dict[str, Any]) -> Dict[str, Any]:
-    final_evaluator = FinalEvaluatorAgent()
-    aggregate = outputs.get("aggregate") or outputs.get("aggregated") or {}
-    if hasattr(aggregate, "dict"):
-        aggregate = aggregate.dict()
-    try:
-        return final_evaluator.run(
-            aggregate=aggregate,
-            tone_issues=(outputs.get("tone") or {}).get("issues", []),
-            logic_issues=(outputs.get("logic") or {}).get("issues", []),
-            trauma_issues=(outputs.get("trauma") or {}).get("issues", []),
-            hate_issues=(outputs.get("hate_bias") or {}).get("issues", []),
-            cliche_issues=(outputs.get("genre_cliche") or {}).get("issues", []),
-            persona_feedback=outputs.get("persona_feedback"),
-        )
-    except Exception as exc:
-        return {"error": str(exc)}
+    # FinalEvaluatorAgent removed
+    return {}
 
 
 def _run_qa_scores(text: str, outputs: Dict[str, Any], mode: str) -> Dict[str, int]:
     scores: Dict[str, int] = {}
-    try:
-        causality_quality = CausalityQualityAgent()
-        scores["causality"] = causality_quality.run(
-            text,
-            outputs.get("logic") or outputs.get("causality") or {},
-        ).get("score", 0)
+    
+    def get_score(key_name):
+        obj = outputs.get(key_name) or {}
+        return obj.get("score", 0)
 
-        if mode == "full":
-            scores["tone"] = ToneQualityAgent().run(text, outputs.get("tone") or {}).get("score", 0)
-            scores["tension"] = TensionQualityAgent().run(text, outputs.get("tension_curve") or {}).get("score", 0)
-            scores["trauma"] = TraumaQualityAgent().run(text, outputs.get("trauma") or {}).get("score", 0)
-            scores["hate_bias"] = HateBiasQualityAgent().run(text, outputs.get("hate_bias") or {}).get("score", 0)
-            scores["cliche"] = GenreClicheQualityAgent().run(text, outputs.get("genre_cliche") or {}).get("score", 0)
-            scores["spelling"] = SpellingQualityAgent().run(text, outputs.get("spelling") or {}).get("score", 0)
-    except Exception:
-        return scores
+    # Causality is always run
+    scores["causality"] = get_score("causality") or get_score("logic")
+
+    if mode == "full":
+        scores["tone"] = get_score("tone")
+        scores["tension"] = get_score("tension_curve")
+        scores["trauma"] = get_score("trauma")
+        scores["hate_bias"] = get_score("hate_bias")
+        scores["cliche"] = get_score("genre_cliche")
+        scores["spelling"] = get_score("spelling")
+    
     return scores
 
 

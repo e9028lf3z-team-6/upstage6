@@ -16,6 +16,7 @@ async function request(path, options = {}) {
   if (!r.ok) {
     if (r.status === 401) {
       localStorage.removeItem('token');
+      // Optional: redirect to login or refresh page
     }
     throw new Error(await r.text());
   }
@@ -29,18 +30,18 @@ export async function listDocuments() {
 export async function uploadDocument(file) {
   const fd = new FormData();
   fd.append('file', file);
-  return request('/documents/upload', { method: 'POST', body: fd });
+  return request('/documents/upload', { method:'POST', body: fd });
 }
 
 export async function getDocument(id) {
   return request(`/documents/${id}`);
 }
 
-export async function updateDocument(id, updates) {
+export async function updateDocument(id, payload) {
   return request(`/documents/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: JSON.stringify(payload)
   });
 }
 
@@ -85,7 +86,34 @@ export async function getMe() {
   return request('/auth/me');
 }
 
-export function logout() {
-  localStorage.removeItem('token');
-  window.location.href = '/';
+export async function* runAnalysisStream(docId) {
+  const url = `${API_BASE}/analysis/run-stream/${docId}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // 마지막 미완성 라인은 다시 버퍼에 저장
+
+    for (const line of lines) {
+      if (line.trim()) {
+        yield JSON.parse(line);
+      }
+    }
+  }
 }
+

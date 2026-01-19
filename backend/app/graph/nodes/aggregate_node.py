@@ -10,9 +10,10 @@ aggregator_agent = IssueBasedAggregatorAgent()
 
 @traceable_timed(name="aggregate")
 def aggregate_node(state: AgentState) -> AgentState:
-    logger.info("[PROGRESS] 4/6 - 모든 분석 결과 취합 및 검증 중...")
+    logger.info("분석 취합: [START]")
+    
     def extract_issues(result: dict | None):
-        if not result or not isinstance(result, dict):
+        if not result:
             return []
         return result.get("issues", [])
 
@@ -25,27 +26,19 @@ def aggregate_node(state: AgentState) -> AgentState:
             "knowledge_level": persona.get("knowledge_level")
         }
 
-    try:
-        aggregate_result = aggregator_agent.run(
-            tone_issues=extract_issues(state.get("tone_result")),
-            logic_issues=extract_issues(state.get("logic_result")),
-            trauma_issues=extract_issues(state.get("trauma_result")),
-            hate_issues=extract_issues(state.get("hate_bias_result")),
-            cliche_issues=extract_issues(state.get("genre_cliche_result")),
-            spelling_issues=extract_issues(state.get("spelling_result")),
-            persona_feedback=None,          # 별도 persona evaluator 붙이면 연결
-            reader_context=reader_context,
-        )
-        result_dict = aggregate_result.model_dump()
-    except Exception as e:
-        logger.error(f"Error in aggregate_node: {e}")
-        result_dict = {
-            "decision": "report", 
-            "summary": f"결과 취합 중 오류가 발생했습니다: {str(e)}",
-            "has_issues": False,
-            "error": str(e)
-        }
+    aggregate_result = aggregator_agent.run(
+        tone_issues=extract_issues(state.get("tone_result")),
+        logic_issues=extract_issues(state.get("logic_result")),
+        trauma_issues=extract_issues(state.get("trauma_result")),
+        hate_issues=extract_issues(state.get("hate_bias_result")),
+        cliche_issues=extract_issues(state.get("genre_cliche_result")),
+        spelling_issues=extract_issues(state.get("spelling_result")),
+        persona_feedback=None,          # 별도 persona evaluator 붙이면 연결
+        reader_context=reader_context,
+    )
+    
+    logger.info("분석 취합: [END]")
 
     return {
-        "aggregated_result": result_dict,
+        "aggregated_result": aggregate_result.model_dump(),
     }

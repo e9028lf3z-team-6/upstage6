@@ -20,7 +20,6 @@ class DocumentOut(BaseModel):
 
 class DocumentDetail(DocumentOut):
     extracted_text: str
-    meta_json: str
 
 
 # -------------------------

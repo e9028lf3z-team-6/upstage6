@@ -3,6 +3,9 @@ from app.agents import RewriteAssistAgent
 from app.agents.utils import extract_split_payload
 from app.graph.state import AgentState
 from app.observability.langsmith import traceable_timed
+import logging
+
+logger = logging.getLogger(__name__)
 
 rewrite_agent = RewriteAssistAgent()
 
@@ -13,6 +16,7 @@ def extract_issues(result: dict | None):
 
 @traceable_timed(name="rewrite")
 def rewrite_node(state: AgentState) -> AgentState:
+    logger.info("수정 제안: [START]")
     split_summary, split_sentences = extract_split_payload(state.get("split_text"))
     if not split_summary and split_sentences:
         split_summary = "\n".join(split_sentences[:5])
@@ -27,6 +31,7 @@ def rewrite_node(state: AgentState) -> AgentState:
         cliche_issues=extract_issues(state.get("genre_cliche_result")),
         spelling_issues=extract_issues(state.get("spelling_result")),
     )
+    logger.info("수정 제안: [END]")
 
     return {
         "rewrite_guidelines": result

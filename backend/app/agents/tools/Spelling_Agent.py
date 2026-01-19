@@ -12,54 +12,58 @@ class SpellingAgent(BaseAgent):
 
     name = "spelling-agent"
 
-    def run(self, split_payload: object, reader_context: dict | None = None) -> dict:
+    def run(self, split_payload: object) -> dict:
         _, sentences = extract_split_payload(split_payload)
         
         all_issues = []
-        chunk_size = 50  # 한 번에 분석할 문장 수
+        scores = []
+        chunk_size = 30  # 한 번에 분석할 문장 수 (속도 개선을 위해 축소)
         
         chunks = []
         for i in range(0, len(sentences), chunk_size):
             chunks.append((sentences[i:i + chunk_size], i))
             
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=8) as executor:  # 병렬 처리 수 확대
             futures = [
-                executor.submit(self._analyze_chunk, chunk, idx, reader_context)
+                executor.submit(self._analyze_chunk, chunk, idx)
                 for chunk, idx in chunks
             ]
             
             for future in as_completed(futures):
                 try:
                     res = future.result()
-                    if res and "issues" in res:
-                        all_issues.extend(res["issues"])
+                    if res:
+                        if "issues" in res:
+                            all_issues.extend(res["issues"])
+                        if "score" in res and isinstance(res["score"], (int, float)):
+                            scores.append(res["score"])
                 except Exception as e:
                     # 개별 청크 실패 시 로그만 남기고 전체 중단 방지
                     print(f"[SpellingAgent] Chunk failed: {e}")
 
         # 정렬: 문장 인덱스 순
         all_issues.sort(key=lambda x: x.get("sentence_index", -1))
+        
+        # 전체 점수 계산 (평균)
+        final_score = 100
+        if scores:
+            final_score = int(sum(scores) / len(scores))
             
         return {
+            "score": final_score,
             "issues": all_issues,
             "note": f"Analyzed {len(sentences)} sentences in {len(chunks)} chunks (Parallel)"
         }
 
-    def _analyze_chunk(self, chunk: list[str], start_index: int, reader_context: dict | None = None) -> dict:
+    def _analyze_chunk(self, chunk: list[str], start_index: int) -> dict:
         system = """
 너는 창작물 교정 보조 시스템이다. 문학적 허용과 구어체를 존중하며, 명백한 오류만 찾아내야 한다.
 반드시 JSON만 출력한다.
 """
         split_context = json.dumps(chunk, ensure_ascii=False)
-        
-        persona_text = ""
-        if reader_context:
-            persona_text = f"\n[독자 특이사항]\n{json.dumps(reader_context, ensure_ascii=False)}\n위 독자의 성향을 참고하되, 맞춤법은 표준 규범을 우선으로 판단하라."
-
         prompt = f"""
 입력은 원고의 문장 배열(JSON)이다. 시작 인덱스는 {start_index}이다.
 각 문장의 sentence_index는 {start_index} + (배열 인덱스)이다.
-{persona_text}
 
 [분석 지침]
 1. **탐지 대상**:
@@ -76,9 +80,11 @@ class SpellingAgent(BaseAgent):
 3. **목표**:
    - 과도한 지적을 지양하고, 작가가 실수한 것으로 보이는 부분만 집어낼 것.
    - 애매하면 지적하지 말 것.
+   - 해당 청크의 맞춤법 정확도를 0~100점 점수로 평가할 것. (오류가 없으면 100점)
 
 출력 형식(JSON):
 {{
+  "score": <int 0-100>,
   "issues": [
     {{
       "issue_type": "spelling | spacing | particle",
