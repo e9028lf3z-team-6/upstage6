@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -100,6 +100,9 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
   const [personaName, setPersonaName] = useState('')
   const [personaDesc, setPersonaDesc] = useState('')
 
+  // 분석 시점의 텍스트 스냅샷 (하이라이팅 좌표 일치용)
+  const [snapshotText, setSnapshotText] = useState('')
+
   const fonts = [
     { name: '마루부리', value: "'MaruBuri', serif" },
     { name: '나눔명조', value: "'Nanum Myeongjo', serif" },
@@ -134,6 +137,23 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
     editable: activeTab === 'draft' // 초고쓰기 탭에서만 편집 가능
   })
 
+  // 분석 실행 래퍼 함수: 스냅샷 저장 후 실행
+  const handleRunAnalysis = (pName, pDesc) => {
+    if (editor) {
+      let currentText = editor.getText()
+      
+      // [UI Fix] Tiptap이 문단 사이에 강제로 넣는 이중 줄바꿈(\n\n)을 단일 줄바꿈(\n)으로 정규화
+      // 이렇게 하면 화면에 줄바꿈이 과도하게 보이는 문제를 해결하면서,
+      // 백엔드 분석 텍스트와 프론트엔드 표시 텍스트가 일치하므로 하이라이팅 좌표도 정확하게 유지됨.
+      currentText = currentText.replace(/\n\n/g, '\n')
+
+      setSnapshotText(currentText)
+      
+      // [Fix] 분석 전 즉시 동기화를 위해 텍스트를 인자로 전달
+      onRunAnalysis(pName, pDesc, currentText)
+    }
+  }
+
   // 문서 이동 시 에디터 콘텐츠 업데이트
   useEffect(() => {
     if (editor && initialText) {
@@ -141,6 +161,8 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
       if (editor.getHTML() !== htmlContent) {
         editor.commands.setContent(htmlContent)
       }
+      // 초기 로드 시 스냅샷도 초기화 (분석 결과가 이미 있을 수 있으므로)
+      setSnapshotText(initialText) 
     }
   }, [initialText, editor])
 
@@ -151,12 +173,15 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
     }
   }, [isAnalyzing])
 
-  // 분석이 완료되면 자동으로 하이라이트 탭으로 이동
+  // 분석이 완료되면 자동으로 하이라이트 탭으로 이동 (단, 분석 중이었다가 완료된 경우에만)
+  // 기존 로직은 analysisResult만 있으면 무조건 이동시켜서 재분석 탭 진입을 막았음.
+  const prevIsAnalyzing = useRef(false)
   useEffect(() => {
-    if (!isAnalyzing && analysisResult && activeTab === 'run_analysis') {
+    if (prevIsAnalyzing.current && !isAnalyzing && analysisResult) {
       setActiveTab('highlight')
     }
-  }, [isAnalyzing, analysisResult, activeTab])
+    prevIsAnalyzing.current = isAnalyzing
+  }, [isAnalyzing, analysisResult])
 
   // 탭 변경 시 에디터 편집 가능 여부 업데이트
   useEffect(() => {
@@ -475,7 +500,8 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
           {activeTab === 'highlight' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
               <div className="ProseMirror">
-                 <HighlightedText text={editor.getText()} analysisResult={analysisResult} setTooltip={setTooltip} />
+                 {/* 분석 당시의 텍스트 스냅샷을 사용하여 좌표 불일치 방지 */}
+                 <HighlightedText text={snapshotText || editor.getText()} analysisResult={analysisResult} setTooltip={setTooltip} />
               </div>
             </div>
           )}
@@ -492,7 +518,7 @@ export default function Editor({ initialText, onSave, analysisResult, setTooltip
                   </p>
                   <button 
                     className="btn" 
-                    onClick={() => onRunAnalysis(personaName, personaDesc)} 
+                    onClick={() => handleRunAnalysis(personaName, personaDesc)} 
                     style={{ 
                       padding: '18px 64px', fontSize: '1.1rem', fontWeight: 800, background: '#4CAF50', color: 'white', border: 'none', borderRadius: 12, cursor: 'pointer', boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)', transition: 'all 0.2s'
                     }}

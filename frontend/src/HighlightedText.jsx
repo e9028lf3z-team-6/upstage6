@@ -19,7 +19,13 @@ const ISSUE_COLORS = {
   default: 'rgba(189, 189, 189, 0.4)'  // Grey
 }
 
-export default function HighlightedText({ text, analysisResult, setTooltip }) {
+export default function HighlightedText({ text: propText, analysisResult, setTooltip }) {
+  // 줄바꿈 정규화: CRLF -> LF (윈도우 환경 등에서 좌표 밀림 방지)
+  // 유니코드 정규화: NFC (맥/리눅스 간 자모 분리 차이 방지)
+  const text = typeof propText === 'string' 
+    ? propText.replace(/\r\n/g, '\n').normalize('NFC') 
+    : propText
+  
   const rawHighlights = Array.isArray(analysisResult?.highlights) ? analysisResult.highlights : []
   const rawNormalized = Array.isArray(analysisResult?.normalized_issues) ? analysisResult.normalized_issues : []
   const hasDocHighlights = rawHighlights.length > 0 || rawNormalized.length > 0

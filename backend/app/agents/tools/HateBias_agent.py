@@ -60,13 +60,23 @@ class HateBiasAgent(BaseAgent):
 You are a strict JSON generator. You MUST output valid JSON only.
 """
         import json
-        # ID를 명시적으로 부여
-        indexed_chunk = [{"id": i, "text": sent} for i, sent in enumerate(chunk)]
-        split_context = json.dumps(indexed_chunk, ensure_ascii=False)
+        
+        # Word Indexing Preprocessing
+        prepared_chunk = []
+        for i, sent in enumerate(chunk):
+            words = sent.split()
+            annotated_sent = " ".join([f"({w_idx}){word}" for w_idx, word in enumerate(words)])
+            prepared_chunk.append({
+                "id": i, 
+                "text": annotated_sent
+            })
+
+        split_context = json.dumps(prepared_chunk, ensure_ascii=False)
 
         prompt = f"""
 너는 '혐오 및 편견 표현 탐지기'이다.
-입력은 원고의 문장 배열(JSON)이며, 각 객체는 "id"와 "text"를 가진다.
+입력은 원고의 문장 배열(JSON)이다.
+각 문장의 "text"는 어절마다 `(번호)단어` 형태로 인덱싱되어 있다.
 
 핵심 원칙:
 - 반드시 '집단적 속성'과 연결된 경우만 issue로 판단할 것
@@ -74,15 +84,15 @@ You are a strict JSON generator. You MUST output valid JSON only.
 
 출력 JSON 형식:
 {{
-  "score": <int 0-100>,
+  "score": <int 0-100, 혐오/편견 없는 청정 윤리 점수>,
   "issues": [
     {{
       "issue_type": "bias | hate | stereotype",
       "severity": "low | medium | high",
-      "ref_id": <int: 입력 객체의 "id" 값을 그대로 복사>,
-      "char_start": 0,
-      "char_end": 0,
-      "quote": "문제 구간 원문 인용",
+      "ref_id": <int: 입력 객체의 "id" (문장 번호)>,
+      "start_word_id": <int: 문제 구간 시작 어절 번호>,
+      "end_word_id": <int: 문제 구간 끝 어절 번호>,
+      "quote": "문제 구간 단어들",
       "reason": "사유 (한국어로 작성)",
       "target": "집단/대상 (한국어로 작성)",
       "bias_type": "혐오 | 편견 | 비하 | 고정관념",
@@ -97,12 +107,44 @@ You are a strict JSON generator. You MUST output valid JSON only.
         response = chat(prompt, system=system)
         result = self._safe_json_load(response)
 
-        # Post-processing
+        # Post-processing: Word ID -> Char Offset
         if "issues" in result and isinstance(result["issues"], list):
             for issue in result["issues"]:
                 ref_id = issue.pop("ref_id", None)
                 if ref_id is not None and isinstance(ref_id, int):
                     issue["sentence_index"] = start_index + ref_id
+                    
+                    s_id = issue.get("start_word_id")
+                    e_id = issue.get("end_word_id")
+                    
+                    if s_id is None and "word_id" in issue:
+                        s_id = issue["word_id"]
+                        e_id = s_id
+
+                    if isinstance(s_id, int) and isinstance(e_id, int) and 0 <= ref_id < len(chunk):
+                        origin_sent = chunk[ref_id]
+                        words = origin_sent.split()
+                        
+                        if 0 <= s_id < len(words) and 0 <= e_id < len(words) and s_id <= e_id:
+                            start_pos = -1
+                            end_pos = -1
+                            current_pos = 0
+                            
+                            for w_idx, w in enumerate(words):
+                                found_idx = origin_sent.find(w, current_pos)
+                                if found_idx != -1:
+                                    if w_idx == s_id:
+                                        start_pos = found_idx
+                                    if w_idx == e_id:
+                                        end_pos = found_idx + len(w)
+                                        break
+                                    current_pos = found_idx + len(w)
+                            
+                            if start_pos != -1 and end_pos != -1:
+                                issue["char_start"] = start_pos
+                                issue["char_end"] = end_pos
+                                issue["quote"] = origin_sent[start_pos:end_pos]
+
                 elif "sentence_index" in issue and isinstance(issue["sentence_index"], int):
                     issue["sentence_index"] = start_index + issue["sentence_index"]
         

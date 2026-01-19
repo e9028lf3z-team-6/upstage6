@@ -41,13 +41,41 @@ def _find_sentence_index(quote: str, sentences: List[str]) -> int | None:
     return None
 
 
-def _find_char_range(quote: str, sentence: str) -> Tuple[int | None, int | None]:
+def _find_char_range_with_hint(
+    quote: str,
+    sentence: str,
+    hint_start: int | None,
+    margin: int = 20
+) -> Tuple[int | None, int | None]:
     if not quote or not sentence:
         return None, None
-    start = sentence.find(quote)
-    if start == -1:
-        return None, None
-    return start, start + len(quote)
+        
+    sentence_len = len(sentence)
+    
+    # 1. Hint 주변 검색 (Proximity Search)
+    if hint_start is not None:
+        # LLM이 준 위치를 기준으로 앞뒤 margin만큼 범위를 좁혀서 검색
+        search_start = max(0, hint_start - margin)
+        search_end = min(sentence_len, hint_start + len(quote) + margin)
+        
+        sub_sentence = sentence[search_start:search_end]
+        sub_idx = sub_sentence.find(quote)
+        
+        if sub_idx != -1:
+            final_start = search_start + sub_idx
+            return final_start, final_start + len(quote)
+
+    # 2. Hint 실패 시 전체 검색 (Fallback)
+    idx = sentence.find(quote)
+    if idx != -1:
+        return idx, idx + len(quote)
+        
+    return None, None
+
+
+def _find_char_range(quote: str, sentence: str) -> Tuple[int | None, int | None]:
+    # Deprecated: Use _find_char_range_with_hint instead if possible
+    return _find_char_range_with_hint(quote, sentence, None)
 
 def _strip_markup(quote: str) -> str:
     if not quote:
@@ -73,43 +101,48 @@ def _build_location(
     char_start = _coerce_int(char_start)
     char_end = _coerce_int(char_end)
 
+    # 1. 인덱스가 아예 없는 경우에만 전역 검색 (기존 로직 유지)
     if sentence_index is None or sentence_index >= len(sentences):
         sentence_index = _find_sentence_index(quote, sentences)
         if sentence_index is None and quote_stripped:
             sentence_index = _find_sentence_index(quote_stripped, sentences)
+    
+    # 2. 인덱스가 유효하지 않으면 포기
     if sentence_index is None or sentence_index >= len(sentences):
         return None
 
+    # 3. [Anchor Locking] 문장 인덱스 고정
     sentence = sentences[sentence_index]
-    if quote and quote not in sentence:
-        matches = [i for i, s in enumerate(sentences) if quote in s]
-        if matches:
-            sentence_index = min(matches, key=lambda i: abs(i - sentence_index))
-            sentence = sentences[sentence_index]
-    if quote_stripped and quote not in sentence and quote_stripped in sentence:
-        quote = quote_stripped
     sentence_len = len(sentence)
+    
+    # 4. 문장 내에서 Quote 찾기 (Proximity Search 적용)
+    final_start, final_end = None, None
 
+    # 4-1. LLM이 준 char offset이 유효하고, 실제 텍스트와 일치하는지 확인
     if char_start is not None and char_end is not None:
         char_start = max(0, min(char_start, sentence_len))
         char_end = max(0, min(char_end, sentence_len))
-        if char_end <= char_start:
-            char_start = None
-            char_end = None
-        elif quote and sentence[char_start:char_end] != quote:
-            start, end = _find_char_range(quote, sentence)
-            if (start is None or end is None) and quote_stripped:
-                start, end = _find_char_range(quote_stripped, sentence)
-            if start is not None and end is not None:
-                char_start, char_end = start, end
+        if char_end > char_start:
+            # 오프셋으로 잘랐을 때 quote와 유사하거나, quote가 없으면 오프셋 신뢰
+            sliced = sentence[char_start:char_end]
+            if not quote or quote in sliced or sliced in quote:
+                final_start, final_end = char_start, char_end
 
-    if char_start is None or char_end is None:
-        start, end = _find_char_range(quote, sentence)
-        if (start is None or end is None) and quote_stripped:
-            start, end = _find_char_range(quote_stripped, sentence)
-        if start is None or end is None:
-            start, end = 0, sentence_len
-        char_start, char_end = start, end
+    # 4-2. 오프셋 신뢰 불가 시, 힌트 기반 검색
+    if final_start is None:
+        if quote:
+            s, e = _find_char_range_with_hint(quote, sentence, char_start)
+            if s is not None:
+                final_start, final_end = s, e
+        
+        if final_start is None and quote_stripped:
+            s, e = _find_char_range_with_hint(quote_stripped, sentence, char_start)
+            if s is not None:
+                final_start, final_end = s, e
+
+    # 5. [Fallback] 정 못 찾겠으면 문장 전체 하이라이팅 (다른 문장으로 튀는 것보다 낫다)
+    if final_start is None:
+        final_start, final_end = 0, sentence_len
 
     if sentence_index >= len(split_map):
         return None
@@ -122,10 +155,10 @@ def _build_location(
 
     return {
         "sentence_index": int(sentence_index),
-        "char_start": int(char_start),
-        "char_end": int(char_end),
-        "doc_start": int(doc_start) + int(char_start),
-        "doc_end": int(doc_start) + int(char_end),
+        "char_start": int(final_start),
+        "char_end": int(final_end),
+        "doc_start": int(doc_start) + int(final_start),
+        "doc_end": int(doc_start) + int(final_end),
     }
 
 

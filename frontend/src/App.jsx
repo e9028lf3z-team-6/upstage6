@@ -643,8 +643,20 @@ export default function App() {
     }
   }
 
-  async function onRunAnalysis(personaName, personaDesc) {
+  async function onRunAnalysis(personaName, personaDesc, textOverride = null) {
     if (!activeDocId) return
+
+    // 만약 에디터에서 최신 텍스트를 넘겨줬다면, DB를 강제로 먼저 업데이트한다. (Debounce 무시)
+    if (textOverride !== null) {
+      try {
+        await updateDocument(activeDocId, { extracted_text: textOverride })
+        setActiveDoc(prev => ({ ...prev, extracted_text: textOverride }))
+      } catch (err) {
+        console.error('Failed to sync text before analysis:', err)
+        pushToast('분석 전 저장에 실패했습니다.', 'error')
+        return
+      }
+    }
 
     setAnalysisElapsedSec(0)
     setIsAnalyzing(true); setError(null)
